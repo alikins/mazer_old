@@ -19,7 +19,7 @@ test_requirements = ['pytest', ]
 
 setup(
     author="Red Hat, Inc.",
-    author_email='audreyr@example.com',
+    author_email='info@ansible.com',
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
