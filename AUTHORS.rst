@@ -5,9 +5,12 @@ Credits
 Development Lead
 ----------------
 
-* Red Hat, Inc.
+* Adrian Likins <@alikins>
+* Chris Houseknecht <@chouseknecht>
+* Alexander Saprykin <@cutwater>
 
-Contributors
-------------
+Based on
+--------
 
-None yet. Why not be the first?
+ansible-galaxy from `<https://github.com/ansible/ansible>`
+
