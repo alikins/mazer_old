@@ -1,3 +1,5 @@
+RST_DOCS_DIR=docs/rst
+
 .PHONY: clean clean-test clean-pyc clean-build docs help
 .DEFAULT_GOAL := help
 
@@ -38,11 +40,11 @@ coverage: ## check code coverage quickly with the default Python
 	coverage html
 
 docs: ## generate Sphinx HTML documentation, including API docs
-	rm -f docs/ansible_galaxy_cli.rst
-	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ ansible_galaxy_cli
-	$(MAKE) -C docs clean
-	$(MAKE) -C docs html
+	rm -f $(RST_DOCS_DIR)/ansible_galaxy_cli.rst
+	rm -f $(RST_DOCS_DIR)/modules.rst
+	sphinx-apidoc -o $(RST_DOCS_DIR) ansible_galaxy_cli
+	$(MAKE) -C $(RST_DOCS_DIR) clean
+	$(MAKE) -C $(RST_DOCS_DIR) html
 
 release: dist ## package and upload a release
 	twine upload dist/*

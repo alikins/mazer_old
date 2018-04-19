@@ -1,5 +1,5 @@
 Welcome to ansible-galaxy-cli's documentation!
-======================================
+==============================================
 
 .. toctree::
    :maxdepth: 2
