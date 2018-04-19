@@ -1,10 +1,10 @@
-pip
-bumpversion==0.5.3
-wheel
-flake8
-tox
+# TODO(alikins): remove bumpverion if we dont use it
+bumpversion
 coverage
-Sphinx
-
+flake8
+pip
 pytest
 pytest-runner
+Sphinx
+tox
+wheel
