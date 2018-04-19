@@ -34,7 +34,7 @@ setup(
     ],
     description="Manage Ansible roles and contents from the command line.",
     install_requires=requirements,
-    license="Apache Software License 2.0",
+    license="Apache-2.0",
     long_description=readme + '\n\n' + history,
     include_package_data=True,
     keywords='ansible_galaxy_cli',
