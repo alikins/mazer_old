@@ -345,10 +345,35 @@ class GalaxyContent(object):
         :param parent_dir: str, parent directory path to extract to
         :kwarg file_name: str, specific filename to extract from parent_dir in archive
         """
+        return self._write_archived_files_impl(tar_file, parent_dir,
+                                               file_name=file_name,
+                                               display_callback=self.display_callback,
+                                               content_type=self.content_type,
+                                               content_name=self.content.name,
+                                               content_path=self.path,
+                                               install_all_content=self._install_all_content,
+                                               force=getattr(self.options, "force", False))
+
+    # FIXME(alikins): terrible name
+    def _write_archived_files_impl(self, tar_file, parent_dir,
+                                   display_callback,
+                                   file_name=None,
+                                   content_type=None,
+                                   content_name=None,
+                                   content_path=None,
+                                   install_all_content=False,
+                                   force=False):
+
+        # TODO(alikins): refactor so the content type specific stuff is extracted
+        # TODO:(alikins) move to it's own module/class, this is basically the logic for persisting the content archive to disk
+        #                and it needs lots more tests
         # now we do the actual extraction to the path
 
+        self.log.debug('tar_file=%s parent_dir=%s file_name=%s content_type=%s content_name=%s content_path=%s',
+                       tar_file, parent_dir, file_name, content_type, content_name, content_path)
         plugin_found = None
         for member in tar_file.getmembers():
+            self.log.debug('tar file member: %s:', member)
             # Have to preserve this to reset it for the sake of processing the
             # same TarFile object many times when handling an ansible-galaxy.yml
             # file
@@ -361,7 +386,7 @@ class GalaxyContent(object):
                 parts_list = member.name.split(os.sep)
 
                 # filter subdirs if provided
-                if self.content_type != "role":
+                if content_type != "role":
                     # Check if the member name (path), minus the tar
                     # archive baseir starts with a subdir we're checking
                     # for
@@ -373,10 +398,10 @@ class GalaxyContent(object):
                         if member.name == os.path.join(parent_dir, file_name):
                             # lstrip self.content.name because that's going to be the
                             # archive directory name and we don't need/want that
-                            plugin_found = parent_dir.lstrip(self.content.name)
+                            plugin_found = parent_dir.lstrip(content_name)
 
-                    elif len(parts_list) > 1 and parts_list[-2] == CONTENT_TYPE_DIR_MAP[self.content_type]:
-                        plugin_found = CONTENT_TYPE_DIR_MAP[self.content_type]
+                    elif len(parts_list) > 1 and parts_list[-2] == CONTENT_TYPE_DIR_MAP[content_type]:
+                        plugin_found = CONTENT_TYPE_DIR_MAP[content_type]
                     if not plugin_found:
                         continue
 
@@ -405,41 +430,43 @@ class GalaxyContent(object):
                         final_parts.append(part)
                 member.name = os.path.join(*final_parts)
 
-                if self.content_type in CONTENT_PLUGIN_TYPES:
-                    self.display_callback(
+                if content_type in CONTENT_PLUGIN_TYPES:
+                    display_callback(
                         "-- extracting %s %s from %s into %s" %
-                        (self.content_type, member.name, self.content.name, os.path.join(self.path, member.name))
+                        (content_type, member.name, content_name, os.path.join(content_path, member.name))
                     )
-                if os.path.exists(os.path.join(self.path, member.name)) and not getattr(self.options, "force", False):
-                    if self.content_type in CONTENT_PLUGIN_TYPES:
+
+                # TODO/FIXME(alikins): separate checking for already installed content from the install step (aside from handling exceptions)
+                if os.path.exists(os.path.join(content_path, member.name)) and not force:
+                    if content_type in CONTENT_PLUGIN_TYPES:
                         message = (
-                            "the specified Galaxy Content %s appears to already exist." % os.path.join(self.path, member.name),
+                            "the specified Galaxy Content %s appears to already exist." % os.path.join(content_path, member.name),
                             "Use of --force for non-role Galaxy Content Type is not yet supported"
                         )
-                        if self._install_all_content:
+                        if install_all_content:
                             # FIXME - Probably a better way to handle this
-                            self.display_callback(" ".join(message), level='warning')
+                            display_callback(" ".join(message), level='warning')
                         else:
                             raise exceptions.GalaxyClientError(" ".join(message))
                     else:
-                        message = "the specified role %s appears to already exist. Use --force to replace it." % self.content.name
-                        if self._install_all_content:
+                        message = "the specified role %s appears to already exist. Use --force to replace it." % content_name
+                        if install_all_content:
                             # FIXME - Probably a better way to handle this
-                            self.display_callback(message, level='warning')
+                            display_callback(message, level='warning')
                         else:
                             raise exceptions.GalaxyClientError(message)
 
                 # Alright, *now* actually write the file
-                tar_file.extract(member, self.path)
+                tar_file.extract(member, content_path)
 
                 # Reset the name so we're on equal playing field for the sake of
                 # re-processing this TarFile object as we iterate through entries
                 # in an ansible-galaxy.yml file
                 member.name = orig_name
 
-        if self.content_type != "role":
+        if content_type != "role":
             if not plugin_found:
-                raise exceptions.GalaxyClientError("Required subdirectory not found in Galaxy Content archive for %s" % self.content.name)
+                raise exceptions.GalaxyClientError("Required subdirectory not found in Galaxy Content archive for %s" % content_name)
 
     def remove(self):
         """
