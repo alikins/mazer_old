@@ -354,8 +354,117 @@ class GalaxyContent(object):
                                                install_all_content=self._install_all_content,
                                                force=getattr(self.options, "force", False))
 
+    # FIXME: mv to static/module method
+    def _write_content_archive_member(self,
+                                      member,
+                                      parent_dir,
+                                      display_callback,
+                                      file_name=None,
+                                      content_type=None,
+                                      content_name=None,
+                                      content_path=None,
+                                      install_all_content=False,
+                                      force=False):
+
+        # Have to preserve this to reset it for the sake of processing the
+        # same TarFile object many times when handling an ansible-galaxy.yml
+        # file
+        orig_name = member.name
+
+        # we only extract files, and remove any relative path
+        # bits that might be in the file for security purposes
+        # and drop any containing directory, as mentioned above
+        if member.isreg() or member.issym():
+            parts_list = member.name.split(os.sep)
+
+            # filter subdirs if provided
+            if content_type != "role":
+                # Check if the member name (path), minus the tar
+                # archive baseir starts with a subdir we're checking
+                # for
+                if file_name:
+                    # The parent_dir passed in when a file name is specified
+                    # should be the full path to the file_name as defined in the
+                    # ansible-galaxy.yml file. If that matches the member.name
+                    # then we've found our match.
+                    if member.name == os.path.join(parent_dir, file_name):
+                        # lstrip self.content.name because that's going to be the
+                        # archive directory name and we don't need/want that
+                        plugin_found = parent_dir.lstrip(content_name)
+
+                elif len(parts_list) > 1 and parts_list[-2] == CONTENT_TYPE_DIR_MAP[content_type]:
+                    plugin_found = CONTENT_TYPE_DIR_MAP[content_type]
+                if not plugin_found:
+                    # TODO: installResults object
+                    return (None, None, content_type)
+
+            if plugin_found:
+                # If this is not a role, we don't expect it to be installed
+                # into a subdir under roles path but instead directly
+                # where it needs to be so that it can immediately be used
+                #
+                # FIXME - are galaxy content types namespaced? if so,
+                #         how do we want to express their path and/or
+                #         filename upon install?
+                if plugin_found in parts_list:
+                    subdir_index = parts_list.index(plugin_found) + 1
+                    parts = parts_list[subdir_index:]
+                else:
+                    # The desired subdir has been identified but the
+                    # current member belongs to another subdir so just
+                    # skip it
+                    return (None, None, content_type)
+            else:
+                parts = member.name.replace(parent_dir, "", 1).split(os.sep)
+
+            final_parts = []
+            for part in parts:
+                if part != '..' and '~' not in part and '$' not in part:
+                    final_parts.append(part)
+            member.name = os.path.join(*final_parts)
+
+            if content_type in CONTENT_PLUGIN_TYPES:
+                display_callback(
+                    "-- extracting %s %s from %s into %s" %
+                    (content_type, member.name, content_name, os.path.join(content_path, member.name))
+                )
+
+            # TODO/FIXME(alikins): separate checking for already installed content from the install step (aside from handling exceptions)
+            if os.path.exists(os.path.join(content_path, member.name)) and not force:
+                if content_type in CONTENT_PLUGIN_TYPES:
+                    message = (
+                        "the specified Galaxy Content %s appears to already exist." % os.path.join(content_path, member.name),
+                        "Use of --force for non-role Galaxy Content Type is not yet supported"
+                    )
+                    if install_all_content:
+                        # FIXME - Probably a better way to handle this
+                        display_callback(" ".join(message), level='warning')
+                    else:
+                        raise exceptions.GalaxyClientError(" ".join(message))
+                else:
+                    message = "the specified role %s appears to already exist. Use --force to replace it." % content_name
+                    if install_all_content:
+                        # FIXME - Probably a better way to handle this
+                        display_callback(message, level='warning')
+                    else:
+                        raise exceptions.GalaxyClientError(message)
+
+            # Alright, *now* actually write the file
+            member_info = (member, content_path, content_type)
+            # tar_file.extract(member, content_path)
+
+            # Reset the name so we're on equal playing field for the sake of
+            # re-processing this TarFile object as we iterate through entries
+            # in an ansible-galaxy.yml file
+            member.name = orig_name
+
+            return member_info
+
+    # FIXME(alikins): this can be a static method now
     # FIXME(alikins): terrible name
-    def _write_archived_files_impl(self, tar_file, parent_dir,
+    def _write_archived_files_impl(self,
+                                   tar_file,
+                                   parent_dir,
                                    display_callback,
                                    file_name=None,
                                    content_type=None,
@@ -372,97 +481,29 @@ class GalaxyContent(object):
         self.log.debug('tar_file=%s parent_dir=%s file_name=%s content_type=%s content_name=%s content_path=%s',
                        tar_file, parent_dir, file_name, content_type, content_name, content_path)
         plugin_found = None
-        for member in tar_file.getmembers():
-            self.log.debug('tar file member: %s:', member)
-            # Have to preserve this to reset it for the sake of processing the
-            # same TarFile object many times when handling an ansible-galaxy.yml
-            # file
-            orig_name = member.name
 
-            # we only extract files, and remove any relative path
-            # bits that might be in the file for security purposes
-            # and drop any containing directory, as mentioned above
-            if member.isreg() or member.issym():
-                parts_list = member.name.split(os.sep)
+        members_to_extract = []
+        for tar_file_member in tar_file.getmembers():
+            self.log.debug('tar file member: %s:', tar_file_member)
 
-                # filter subdirs if provided
-                if content_type != "role":
-                    # Check if the member name (path), minus the tar
-                    # archive baseir starts with a subdir we're checking
-                    # for
-                    if file_name:
-                        # The parent_dir passed in when a file name is specified
-                        # should be the full path to the file_name as defined in the
-                        # ansible-galaxy.yml file. If that matches the member.name
-                        # then we've found our match.
-                        if member.name == os.path.join(parent_dir, file_name):
-                            # lstrip self.content.name because that's going to be the
-                            # archive directory name and we don't need/want that
-                            plugin_found = parent_dir.lstrip(content_name)
+            member_info = self._write_content_archive_member(tar_file_member,
+                                                             parent_dir,
+                                                             display_callback,
+                                                             file_name=None,
+                                                             content_type=None,
+                                                             content_name=None,
+                                                             content_path=None,
+                                                             install_all_content=False,
+                                                             force=False)
 
-                    elif len(parts_list) > 1 and parts_list[-2] == CONTENT_TYPE_DIR_MAP[content_type]:
-                        plugin_found = CONTENT_TYPE_DIR_MAP[content_type]
-                    if not plugin_found:
-                        continue
+            self.log.debug('member_info: %s', member_info)
+            if member_info and member_info[0]:
+                members_to_extract.append(member_info)
 
-                if plugin_found:
-                    # If this is not a role, we don't expect it to be installed
-                    # into a subdir under roles path but instead directly
-                    # where it needs to be so that it can immediately be used
-                    #
-                    # FIXME - are galaxy content types namespaced? if so,
-                    #         how do we want to express their path and/or
-                    #         filename upon install?
-                    if plugin_found in parts_list:
-                        subdir_index = parts_list.index(plugin_found) + 1
-                        parts = parts_list[subdir_index:]
-                    else:
-                        # The desired subdir has been identified but the
-                        # current member belongs to another subdir so just
-                        # skip it
-                        continue
-                else:
-                    parts = member.name.replace(parent_dir, "", 1).split(os.sep)
-
-                final_parts = []
-                for part in parts:
-                    if part != '..' and '~' not in part and '$' not in part:
-                        final_parts.append(part)
-                member.name = os.path.join(*final_parts)
-
-                if content_type in CONTENT_PLUGIN_TYPES:
-                    display_callback(
-                        "-- extracting %s %s from %s into %s" %
-                        (content_type, member.name, content_name, os.path.join(content_path, member.name))
-                    )
-
-                # TODO/FIXME(alikins): separate checking for already installed content from the install step (aside from handling exceptions)
-                if os.path.exists(os.path.join(content_path, member.name)) and not force:
-                    if content_type in CONTENT_PLUGIN_TYPES:
-                        message = (
-                            "the specified Galaxy Content %s appears to already exist." % os.path.join(content_path, member.name),
-                            "Use of --force for non-role Galaxy Content Type is not yet supported"
-                        )
-                        if install_all_content:
-                            # FIXME - Probably a better way to handle this
-                            display_callback(" ".join(message), level='warning')
-                        else:
-                            raise exceptions.GalaxyClientError(" ".join(message))
-                    else:
-                        message = "the specified role %s appears to already exist. Use --force to replace it." % content_name
-                        if install_all_content:
-                            # FIXME - Probably a better way to handle this
-                            display_callback(message, level='warning')
-                        else:
-                            raise exceptions.GalaxyClientError(message)
-
-                # Alright, *now* actually write the file
-                tar_file.extract(member, content_path)
-
-                # Reset the name so we're on equal playing field for the sake of
-                # re-processing this TarFile object as we iterate through entries
-                # in an ansible-galaxy.yml file
-                member.name = orig_name
+        self.log.debug('members_to_extract: %s', members_to_extract)
+        for member_to_extract in members_to_extract:
+            self.log.debug('tar_file.extract(%s, path=%s)', member_to_extract[0], member_to_extract[1])
+            tar_file.extract(member_to_extract[0], path=member_to_extract[1])
 
         if content_type != "role":
             if not plugin_found:
@@ -693,7 +734,7 @@ class GalaxyContent(object):
                                 if not os.path.isdir(self.path):
                                     raise exceptions.GalaxyClientError("the specified roles path exists and is not a directory.")
                                 elif not getattr(self.options, "force", False):
-                                    msg = "the specified role %s appears to already exist. Use --force to replace it." % self.content.name
+                                    msg = "the specified role %s appears to already exist at %s. Use --force to replace it." % (self.content.name, self.path)
                                     raise exceptions.GalaxyClientError(msg)
                                 else:
                                     # using --force, remove the old path

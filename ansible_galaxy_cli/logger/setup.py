@@ -44,6 +44,9 @@ DEFAULT_LOGGING_CONFIG = {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
         },
+        'ansible_galaxy.flat_rest_api.api': {
+            'level': 'INFO'
+        },
         'ansible_galaxy_cli': {
             'handlers': ['console', 'file'],
             'level': 'DEBUG',
