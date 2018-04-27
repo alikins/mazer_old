@@ -116,7 +116,7 @@ class GalaxyContent(object):
 
         # REMOVEME
         # NOTE: some unset type?
-        self.content_type = None
+        self.content_type = content_type
         self.type_dir = None
         self._set_type(content_type)
 
@@ -341,7 +341,11 @@ class GalaxyContent(object):
 
         return True
 
-    def _write_archived_files(self, tar_file, parent_dir, file_name=None):
+    def _write_archived_files(self, tar_file, parent_dir, file_name=None,
+                              content_type=None,
+                              content_name=None,
+                              content_path=None,
+                              install_all_content=None):
         """
         Extract and write out files from the archive, this is a common operation
         needed for both old-roles and new-style galaxy content, the main
@@ -354,24 +358,25 @@ class GalaxyContent(object):
         return self._write_archived_files_impl(tar_file, parent_dir,
                                                file_name=file_name,
                                                display_callback=self.display_callback,
-                                               content_type=self.content_type,
-                                               content_name=self.content.name,
-                                               content_path=self.path,
-                                               install_all_content=self._install_all_content,
+                                               content_type=content_type or self.content_type,
+                                               content_name=content_name or self.content.name,
+                                               content_path=content_path or self.path,
+                                               install_all_content=install_all_content or self._install_all_content,
                                                force=getattr(self.options, "force", False))
 
     # FIXME: mv to static/module method
-    def _write_content_archive_member(self,
-                                      member,
-                                      parent_dir,
-                                      display_callback,
-                                      file_name=None,
-                                      content_type=None,
-                                      content_name=None,
-                                      content_path=None,
-                                      install_all_content=False,
-                                      force=False):
+    def _find_content_archive_members_to_extract(self,
+                                                 member,
+                                                 parent_dir,
+                                                 display_callback,
+                                                 file_name=None,
+                                                 content_type=None,
+                                                 content_name=None,
+                                                 content_path=None,
+                                                 install_all_content=False,
+                                                 force=False):
 
+        plugin_found = False
         # Have to preserve this to reset it for the sake of processing the
         # same TarFile object many times when handling an ansible-galaxy.yml
         # file
@@ -390,12 +395,13 @@ class GalaxyContent(object):
         parts_list = member.name.split(os.sep)
 
         self.log.debug('file_name: %s content_name: %s content_type: %s', file_name, content_name, content_type)
-        self.log.debug('CONTENT_TYPE_DIR_MAP: %s', json.dumps(CONTENT_TYPE_DIR_MAP, indent=2))
-        self.log.debug('parts_list: %s len(parts_list): %s parts_list[-2]: %s', parts_list, len(parts_list), parts_list[-2])
+        # self.log.debug('CONTENT_TYPE_DIR_MAP: %s', json.dumps(CONTENT_TYPE_DIR_MAP, indent=2))
+        # self.log.debug('parts_list: %s len(parts_list): %s parts_list[-2]: %s', parts_list, len(parts_list), parts_list[-2])
         # filter subdirs if provided
-
         if content_type is None:
             self.log.debug('content_type is None, nothing to extract/install/write_content_archive')
+            # import traceback
+            # traceback.print_stack()
             return (None, None, content_type, orig_name, None)
 
         # FIXME: replace with a map lookup of role->content_archive_installer and
@@ -439,7 +445,6 @@ class GalaxyContent(object):
         else:
             # FIXME: return the new name in member_info but dont munge it in place
             # FIXME(alikins): dont munge member data
-            # NOTE: modifies member.name temporaily for some reason
             parts = member.name.replace(parent_dir, "", 1).split(os.sep)
 
         final_parts = []
@@ -512,22 +517,23 @@ class GalaxyContent(object):
         members_to_extract = []
         # TODO: could filter paths here
         for tar_file_member in tar_file.getmembers():
-            self.log.debug('tar file member: %s:', tar_file_member)
+            # self.log.debug('tar file member: %s:', tar_file_member)
 
-            member_info = self._write_content_archive_member(tar_file_member,
-                                                             parent_dir,
-                                                             display_callback,
-                                                             file_name=None,
-                                                             content_type=None,
-                                                             content_name=None,
-                                                             content_path=None,
-                                                             install_all_content=False,
-                                                             force=False)
+            member_info = self._find_content_archive_members_to_extract(tar_file_member,
+                                                                        parent_dir,
+                                                                        display_callback,
+                                                                        file_name=file_name,
+                                                                        content_type=content_type,
+                                                                        content_name=content_name,
+                                                                        content_path=content_path,
+                                                                        install_all_content=install_all_content,
+                                                                        force=force)
 
             self.log.debug('member_info: %s', member_info)
             if member_info and member_info[0]:
                 members_to_extract.append(member_info)
 
+        self.log.debug('tar_file.getnames(): %s', json.dumps(tar_file.getnames(), indent=2))
         self.log.debug('members_to_extract: %s', members_to_extract)
         for member_to_extract in members_to_extract:
             name_to_extract_to = member_to_extract[4]
@@ -539,8 +545,8 @@ class GalaxyContent(object):
                 self.log.debug('skipping extracting %s because name_to_extract_to is None', member_to_extract)
                 continue
 
-            self.log.info('extracting name_to_extract_to=%s path=%s', name_to_extract_to, member_to_extract[1])
-            tar_file.extract(name_to_extract_to, path=member_to_extract[1])
+            self.log.info('extracting %s -> %s', member_to_extract[0], member_to_extract[1])
+            tar_file.extract(member_to_extract[0], path=member_to_extract[1])
 
         if content_type != "role":
             if not plugin_found:
@@ -699,6 +705,9 @@ class GalaxyContent(object):
                                 else:
                                     meta_file = member
 
+                i_content_type = None
+                i_content_path = None
+                i_install_all_content = False
                 # FIXME: THIS IS A HACK
                 #
                 # We've determined that this is a legacy role, we're going to
@@ -707,6 +716,9 @@ class GalaxyContent(object):
                 if self.content_type == "all" and meta_file:
                     self._set_type("role")
                     self._set_content_paths(self._orig_path)
+                    i_content_type = 'role'
+                    i_content_path = self._orig_path
+                    i_install_all_content = False
                     self._install_all_content = False
 
                 if not archive_parent_dir:
@@ -718,7 +730,7 @@ class GalaxyContent(object):
                         # we check parent dir based on the correct subdir existing or
                         # we need to just scan the subdirs heuristically and figure out
                         # what to do
-                        if self.content_type != "all":
+                        if i_content_type != "all":
                             if self.type_dir in member.name:
                                 archive_parent_dir = os.path.dirname(member.name)
                                 parent_dir_found = True
@@ -733,12 +745,12 @@ class GalaxyContent(object):
                                 break
 
                     if not parent_dir_found:
-                        if self.content_type in CONTENT_PLUGIN_TYPES:
-                            msg = "No content metadata provided, nor content directories found for content_type: %s" % self.content_type
+                        if i_content_type in CONTENT_PLUGIN_TYPES:
+                            msg = "No content metadata provided, nor content directories found for content_type: %s" % i_content_type
                             raise exceptions.GalaxyClientError(msg)
 
-                self.log.debug("meta_file: %s galaxy_file: %s self.content_type: %s", meta_file, galaxy_file, self.content_type)
-                if not meta_file and not galaxy_file and self.content_type == "role":
+                self.log.debug("meta_file: %s galaxy_file: %s self.content_type: %s i_content_type", meta_file, galaxy_file, self.content_type, i_content_type)
+                if not meta_file and not galaxy_file and i_content_type == "role":
                     raise exceptions.GalaxyClientError("this role does not appear to have a meta/main.yml file or ansible-galaxy.yml.")
                 else:
                     try:
@@ -781,8 +793,10 @@ class GalaxyContent(object):
                             else:
                                 os.makedirs(self.path)
 
-
-                            self._write_archived_files(content_tar_file, archive_parent_dir)
+                            self._write_archived_files(content_tar_file, archive_parent_dir,
+                                                       content_type=i_content_type,
+                                                       content_path=i_content_path,
+                                                       install_all_content=i_install_all_content)
 
                             # write out the install info file for later use
                             self._write_galaxy_install_info()
@@ -900,7 +914,7 @@ class GalaxyContent(object):
                             # heuristically walking the directories and install
                             # the appropriate things in the appropriate places
 
-                            if self.content_type != "all":
+                            if i_content_type != "all":
                                 self._write_archived_files(content_tar_file, archive_parent_dir)
                                 installed = True
                             else:
