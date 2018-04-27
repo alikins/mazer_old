@@ -393,6 +393,13 @@ class GalaxyContent(object):
         self.log.debug('CONTENT_TYPE_DIR_MAP: %s', json.dumps(CONTENT_TYPE_DIR_MAP, indent=2))
         self.log.debug('parts_list: %s len(parts_list): %s parts_list[-2]: %s', parts_list, len(parts_list), parts_list[-2])
         # filter subdirs if provided
+
+        if content_type is None:
+            self.log.debug('content_type is None, nothing to extract/install/write_content_archive')
+            return (None, None, content_type, orig_name, None)
+
+        # FIXME: replace with a map lookup of role->content_archive_installer and
+        #        handle unknown content_type
         if content_type != "role":
             # Check if the member name (path), minus the tar
             # archive baseir starts with a subdir we're checking
@@ -503,6 +510,7 @@ class GalaxyContent(object):
         plugin_found = None
 
         members_to_extract = []
+        # TODO: could filter paths here
         for tar_file_member in tar_file.getmembers():
             self.log.debug('tar file member: %s:', tar_file_member)
 
@@ -524,6 +532,14 @@ class GalaxyContent(object):
         for member_to_extract in members_to_extract:
             name_to_extract_to = member_to_extract[4]
             self.log.debug('tar_file.extract(%s, path=%s) name_to_extract_to: %s ', member_to_extract[0], member_to_extract[1], name_to_extract_to)
+
+            # skip anything with name_to_extract_to
+            # FIXME: a object with a specific 'skip me' field would be better
+            if not name_to_extract_to:
+                self.log.debug('skipping extracting %s because name_to_extract_to is None', member_to_extract)
+                continue
+
+            self.log.info('extracting name_to_extract_to=%s path=%s', name_to_extract_to, member_to_extract[1])
             tar_file.extract(name_to_extract_to, path=member_to_extract[1])
 
         if content_type != "role":
