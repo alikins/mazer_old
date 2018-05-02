@@ -29,10 +29,7 @@ import fnmatch
 import json
 import logging
 import os
-import shutil
 from shutil import rmtree
-import six
-import subprocess
 import tarfile
 import tempfile
 import yaml
@@ -43,10 +40,11 @@ from ansible_galaxy.flat_rest_api.api import GalaxyAPI
 from ansible_galaxy.config import defaults
 from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
-from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP, VALID_ROLE_SPEC_KEYS
+from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP
 from ansible_galaxy.models import content
-from ansible_galaxy.utils.content_name import repo_url_to_content_name
-from ansible_galaxy.utils.role_spec import role_spec_parse
+from ansible_galaxy.utils.yaml_parse import yaml_parse
+from ansible_galaxy.utils.content_name import parse_content_name
+
 
 from ansible_galaxy.flat_rest_api.urls import open_url
 
@@ -56,27 +54,6 @@ log = logging.getLogger(__name__)
 # FIXME: erk, and a metadata (ie, ansible-galaxy.yml)
 #
 # can provide a ContentInstallInfo
-
-
-# TODO: test cases
-# TODO: class/type for a content spec
-def parse_content_name(content_name):
-    "split a full content_name into username, content_name"
-
-    repo_name = None
-    try:
-        parts = content_name.split(".")
-        user_name = parts[0]
-        if len(parts) > 2:
-            repo_name = parts[1]
-            content_name = '.'.join(parts[2:])
-        else:
-            content_name = '.'.join(parts[1:])
-    except Exception as e:
-        log.exception(e)
-        raise exceptions.GalaxyClientError("Invalid content name (%s). Specify content as format: username.contentname" % content_name)
-
-    return (user_name, repo_name, content_name)
 
 
 def tar_info_content_name_match(tar_info, content_name, content_path=None):
@@ -981,7 +958,7 @@ class GalaxyContent(object):
                                                 if 'src' not in dep:
                                                     raise exceptions.GalaxyClientError("ansible-galaxy.yml dependencies must provide a src")
 
-                                                dep_content_info = GalaxyContent.yaml_parse(dep['src'])
+                                                dep_content_info = yaml_parse(dep['src'])
                                                 # FIXME - Should we assume this to be true for module deps?
                                                 dep_content_info["type"] = "module_util"
 
@@ -1118,130 +1095,3 @@ class GalaxyContent(object):
         """
         return dict(scm=self.scm, src=self.src, version=self.version, name=self.content.name)
 
-    # FIXME: dont see any reason not to mv this somewhere more general
-    @staticmethod
-    def scm_archive_content(src, scm='git', name=None, version='HEAD'):
-        """
-        Archive a Galaxy Content SCM repo locally
-
-        Implementation originally adopted from the Ansible RoleRequirement
-        """
-        if scm not in ['hg', 'git']:
-            raise exceptions.GalaxyClientError("- scm %s is not currently supported" % scm)
-        tempdir = tempfile.mkdtemp()
-        clone_cmd = [scm, 'clone', src, name]
-        with open('/dev/null', 'w') as devnull:
-            try:
-                popen = subprocess.Popen(clone_cmd, cwd=tempdir, stdout=devnull, stderr=devnull)
-            except Exception as e:
-                raise exceptions.GalaxyClientError("error executing: %s" % " ".join(clone_cmd))
-            rc = popen.wait()
-        if rc != 0:
-            raise exceptions.GalaxyClientError("- command %s failed in directory %s (rc=%s)" % (' '.join(clone_cmd), tempdir, rc))
-
-        if scm == 'git' and version:
-            checkout_cmd = [scm, 'checkout', version]
-            with open('/dev/null', 'w') as devnull:
-                try:
-                    popen = subprocess.Popen(checkout_cmd, cwd=os.path.join(tempdir, name), stdout=devnull, stderr=devnull)
-                except (IOError, OSError):
-                    raise exceptions.GalaxyClientError("error executing: %s" % " ".join(checkout_cmd))
-                rc = popen.wait()
-            if rc != 0:
-                raise exceptions.GalaxyClientError("- command %s failed in directory %s (rc=%s)" % (' '.join(checkout_cmd), tempdir, rc))
-
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.tar')
-        if scm == 'hg':
-            archive_cmd = ['hg', 'archive', '--prefix', "%s/" % name]
-            if version:
-                archive_cmd.extend(['-r', version])
-            archive_cmd.append(temp_file.name)
-        if scm == 'git':
-            archive_cmd = ['git', 'archive', '--prefix=%s/' % name, '--output=%s' % temp_file.name]
-            if version:
-                archive_cmd.append(version)
-            else:
-                archive_cmd.append('HEAD')
-
-        with open('/dev/null', 'w') as devnull:
-            popen = subprocess.Popen(archive_cmd, cwd=os.path.join(tempdir, name),
-                                     stderr=devnull, stdout=devnull)
-            rc = popen.wait()
-        if rc != 0:
-            raise exceptions.GalaxyClientError("- command %s failed in directory %s (rc=%s)" % (' '.join(archive_cmd), tempdir, rc))
-
-        shutil.rmtree(tempdir, ignore_errors=True)
-        return temp_file.name
-
-    # TODO: return a new GalaxyContentMeta
-    # TODO: dont munge the passed in content
-    # TODO: split into smaller methods
-    # FIXME: does this actually use yaml?
-    # FIXME: kind of seems like this does two different things
-    @staticmethod
-    def yaml_parse(content):
-        """parses the passed in yaml string and returns a dict with name/src/scm/version
-
-        Or... if the passed in 'content' is a dict, it either creates role or if not a role,
-        it copies the dict and sets name/src/scm/version in it"""
-
-        # TODO: move to own method
-        if isinstance(content, six.string_types):
-            name = None
-            scm = None
-            src = None
-            version = None
-            if ',' in content:
-                if content.count(',') == 1:
-                    (src, version) = content.strip().split(',', 1)
-                elif content.count(',') == 2:
-                    (src, version, name) = content.strip().split(',', 2)
-                else:
-                    raise exceptions.GalaxyClientError("Invalid content line (%s). Proper format is 'content_name[,version[,name]]'" % content)
-            else:
-                src = content
-
-            if name is None:
-                name = repo_url_to_content_name(src)
-            if '+' in src:
-                (scm, src) = src.split('+', 1)
-
-            return dict(name=name, src=src, scm=scm, version=version)
-
-        # Not sure what will/should happen if content is not a Mapping or a string
-        if 'role' in content:
-            name = content['role']
-            if ',' in name:
-                # Old style: {role: "galaxy.role,version,name", other_vars: "here" }
-                # Maintained for backwards compat
-                content = role_spec_parse(content['role'])
-            else:
-                del content['role']
-                content['name'] = name
-        else:
-            content = content.copy()
-
-            if 'src'in content:
-                # New style: { src: 'galaxy.role,version,name', other_vars: "here" }
-                if 'github.com' in content["src"] and 'http' in content["src"] and '+' not in content["src"] and not content["src"].endswith('.tar.gz'):
-                    content["src"] = "git+" + content["src"]
-
-                if '+' in content["src"]:
-                    (scm, src) = content["src"].split('+')
-                    content["scm"] = scm
-                    content["src"] = src
-
-                if 'name' not in content:
-                    content["name"] = repo_url_to_content_name(content["src"])
-
-            if 'version' not in content:
-                content['version'] = ''
-
-            if 'scm' not in content:
-                content['scm'] = None
-
-        for key in list(content.keys()):
-            if key not in VALID_ROLE_SPEC_KEYS:
-                content.pop(key)
-
-        return content
