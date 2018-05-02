@@ -635,6 +635,34 @@ class GalaxyContent(object):
         # to the specified (or default) content directory
         local_file = False
 
+        # ContentArchive
+        #   path: None
+        #   scm_info: ScmInfo()
+        #   galaxy_content:
+        #     username
+        #     namespace
+        #     repo_name
+        #     content_name
+        #     versions: []
+        #     repository:
+        #       external_url:
+        #     scm_branch: ?
+        #     archive_url:
+        #   contents:
+        #    - name: content1
+        #      meta_file:
+        #        role_name:
+        #        version:
+        #        deps:
+        #      galaxy_metadata:
+        #        whichever_data:
+        #        other_ansible_galaxy_yml_data:
+        #      path_in_archive:
+        #      path_to_install_to:
+        #      content_type:
+        #    - name: content2
+        #      <..>
+        #
         # FIXME: this is loading and persisting the archive and should be extract to another class/method
         # FIXME: the exception case is no self.scm and no self.src, so detect that early and raise then unindent
         if self.scm:
