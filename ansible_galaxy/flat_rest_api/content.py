@@ -45,6 +45,8 @@ from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
 from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP, VALID_ROLE_SPEC_KEYS
 from ansible_galaxy.models import content
+from ansible_galaxy.utils.content_name import repo_url_to_content_name
+from ansible_galaxy.utils.role_spec import role_spec_parse
 
 from ansible_galaxy.flat_rest_api.urls import open_url
 
@@ -1200,7 +1202,7 @@ class GalaxyContent(object):
                 src = content
 
             if name is None:
-                name = GalaxyContent.repo_url_to_content_name(src)
+                name = repo_url_to_content_name(src)
             if '+' in src:
                 (scm, src) = src.split('+', 1)
 
@@ -1212,7 +1214,7 @@ class GalaxyContent(object):
             if ',' in name:
                 # Old style: {role: "galaxy.role,version,name", other_vars: "here" }
                 # Maintained for backwards compat
-                content = GalaxyContent.role_spec_parse(content['role'])
+                content = role_spec_parse(content['role'])
             else:
                 del content['role']
                 content['name'] = name
@@ -1230,7 +1232,7 @@ class GalaxyContent(object):
                     content["src"] = src
 
                 if 'name' not in content:
-                    content["name"] = GalaxyContent.repo_url_to_content_name(content["src"])
+                    content["name"] = repo_url_to_content_name(content["src"])
 
             if 'version' not in content:
                 content['version'] = ''
@@ -1243,66 +1245,3 @@ class GalaxyContent(object):
                 content.pop(key)
 
         return content
-
-    @staticmethod
-    def repo_url_to_content_name(repo_url):
-        # gets the role name out of a repo like
-        # http://git.example.com/repos/repo.git" => "repo"
-
-        if '://' not in repo_url and '@' not in repo_url:
-            return repo_url
-        trailing_path = repo_url.split('/')[-1]
-        if trailing_path.endswith('.git'):
-            trailing_path = trailing_path[:-4]
-        if trailing_path.endswith('.tar.gz'):
-            trailing_path = trailing_path[:-7]
-        if ',' in trailing_path:
-            trailing_path = trailing_path.split(',')[0]
-        return trailing_path
-
-    # FIXME: likely needs to learn version=1,name='blip', etc. And tests
-    @staticmethod
-    def role_spec_parse(role_spec):
-        # takes a repo and a version like
-        # git+http://git.example.com/repos/repo.git,v1.0
-        # and returns a list of properties such as:
-        # {
-        #   'scm': 'git',
-        #   'src': 'http://git.example.com/repos/repo.git',
-        #   'version': 'v1.0',
-        #   'name': 'repo'
-        # }
-        log.warning("The comma separated role spec format, use the yaml/explicit format instead. Line that trigger this: %s (version='2.7')", role_spec)
-
-        default_role_versions = dict(git='master', hg='tip')
-
-        role_spec = role_spec.strip()
-        role_version = ''
-        if role_spec == "" or role_spec.startswith("#"):
-            return (None, None, None, None)
-
-        tokens = [s.strip() for s in role_spec.split(',')]
-
-        # assume https://github.com URLs are git+https:// URLs and not
-        # tarballs unless they end in '.zip'
-        if 'github.com/' in tokens[0] and not tokens[0].startswith("git+") and not tokens[0].endswith('.tar.gz'):
-            tokens[0] = 'git+' + tokens[0]
-
-        if '+' in tokens[0]:
-            (scm, role_url) = tokens[0].split('+')
-        else:
-            scm = None
-            role_url = tokens[0]
-
-        if len(tokens) >= 2:
-            role_version = tokens[1]
-
-        if len(tokens) == 3:
-            role_name = tokens[2]
-        else:
-            role_name = GalaxyContent.repo_url_to_content_name(tokens[0])
-
-        if scm and not role_version:
-            role_version = default_role_versions.get(scm, '')
-
-        return dict(scm=scm, src=role_url, version=role_version, name=role_name)
