@@ -29,6 +29,7 @@ import fnmatch
 import json
 import logging
 import os
+import re
 import shutil
 from shutil import rmtree
 import six
@@ -77,7 +78,7 @@ def parse_content_name(content_name):
 
 
 # TODO: move to module scope
-def tar_info_content_name_match(tar_info, content_name, content_path=None):
+def tar_info_content_name_match(tar_info, content_name=None, content_path=None, match_pattern=None):
     # only reg files or symlinks can match
     if not tar_info.isreg() and not tar_info.islnk():
         return False
@@ -85,15 +86,32 @@ def tar_info_content_name_match(tar_info, content_name, content_path=None):
     content_path = content_path or ""
 
     # TODO: test cases for patterns
-    match_pattern = '*%s*' % content_name
-    if content_path:
-        match_pattern = '*/%s/%s*' % (content_path, content_name)
+    # match_pattern = match_pattern or '*%s*' % content_name
+    #if content_path:
+    #    match_pattern = '*/%s/%s*' % (content_path, content_name)
 
     # FIXME: would be better as two predicates both apply by comprehension
     if fnmatch.fnmatch(tar_info.name, match_pattern):
         return True
 
     return False
+
+
+def change_tar_members_prefix(members, old_prefix_regex=None, new_prefix=None):
+    '''Change the top level dir name for each entry in members in place and return it'''
+    log.debug('new_top_dir=%s old_prefix_regex=%s', new_prefix, old_prefix_regex)
+    # log.debug('members=%s', members)
+    for member in members:
+        log.debug('member.name=%s', member.name)
+        name = member.name
+        # path_parts = member.name.split(os.path.sep)
+        if re.match(old_prefix_regex, member.name):
+            name = re.sub(old_prefix_regex, new_prefix, member.name)
+        #name = os.path.join(new_prefix, *path_parts[1:])
+        log.debug('new_name=%s', name)
+        member.name = name
+        #log.debug('path_parts=%s top=%s', path_parts, path_parts[0])
+    return members
 
 
 class GalaxyContent(object):
@@ -433,7 +451,7 @@ class GalaxyContent(object):
         :kwarg file_name: str, specific filename to extract from parent_dir in archive
         """
         # now we do the actual extraction to the path
-        self.log.debug('tar_file=%s, parent_dir=%s, file_name=%s', tar_file, parent_dir, file_name)
+        # self.log.debug('tar_file=%s, parent_dir=%s, file_name=%s', tar_file, parent_dir, file_name)
         files_to_extract = files_to_extract or []
         plugin_found = None
 
@@ -451,8 +469,8 @@ class GalaxyContent(object):
             # file
             orig_name = member.name
             # self.log.debug('member.name=%s', member.name)
-            self.log.debug('member=%s, orig_name=%s, member.isreg()=%s member.issym()=%s',
-                           member, orig_name, member.isreg(), member.issym())
+            #self.log.debug('member=%s, orig_name=%s, member.isreg()=%s member.issym()=%s',
+            #               member, orig_name, member.isreg(), member.issym())
             # we only extract files, and remove any relative path
             # bits that might be in the file for security purposes
             # and drop any containing directory, as mentioned above
@@ -461,15 +479,15 @@ class GalaxyContent(object):
             if member.isreg() or member.issym():
                 parts_list = member.name.split(os.sep)
 
-                self.log.debug('content_type: %s', self.content_type)
+                # self.log.debug('content_type: %s', self.content_type)
                 # filter subdirs if provided
                 if self.content_type != "role":
                     # Check if the member name (path), minus the tar
                     # archive baseir starts with a subdir we're checking
                     # for
-                    self.log.debug('parts_list: %s', parts_list)
-                    self.log.debug('parts_list[1]: %s', parts_list[1])
-                    self.log.debug('CONTENT_TYPE_DIR_MAP[self.content_type]: %s', CONTENT_TYPE_DIR_MAP[self.content_type])
+                    # self.log.debug('parts_list: %s', parts_list)
+                    # self.log.debug('parts_list[1]: %s', parts_list[1])
+                    # self.log.debug('CONTENT_TYPE_DIR_MAP[self.content_type]: %s', CONTENT_TYPE_DIR_MAP[self.content_type])
                     if file_name:
                         # The parent_dir passed in when a file name is specified
                         # should be the full path to the file_name as defined in the
@@ -483,11 +501,11 @@ class GalaxyContent(object):
                     elif len(parts_list) > 1 and parts_list[1] == CONTENT_TYPE_DIR_MAP[self.content_type]:
                         plugin_found = CONTENT_TYPE_DIR_MAP[self.content_type]
 
-                    self.log.debug('plugin_found1: %s', plugin_found)
+                    # self.log.debug('plugin_found1: %s', plugin_found)
                     if not plugin_found:
                         continue
 
-                self.log.debug('plugin_found2: %s', plugin_found)
+                # self.log.debug('plugin_found2: %s', plugin_found)
                 if plugin_found:
                     # If this is not a role, we don't expect it to be installed
                     # into a subdir under roles path but instead directly
@@ -510,24 +528,25 @@ class GalaxyContent(object):
                             continue
                 else:
                     parts = member.name.replace(parent_dir, "", 1).split(os.sep)
-                    self.log.debug('plugin_found falsey, building parts: %s', parts)
+                    # self.log.debug('plugin_found falsey, building parts: %s', parts)
 
                 final_parts = []
                 for part in parts:
                     if part != '..' and '~' not in part and '$' not in part:
                         final_parts.append(part)
                 member.name = os.path.join(*final_parts)
-                self.log.debug('final_parts: %s', final_parts)
+                # self.log.debug('final_parts: %s', final_parts)
 
                 if self.content_type in CONTENT_PLUGIN_TYPES:
                     self.display_callback(
                         "-- extracting %s %s from %s into %s" %
                         (self.content_type, member.name, self.content.name, os.path.join(path, member.name))
                     )
-                if os.path.exists(os.path.join(path, member.name)) and not getattr(self.options, "force", False):
+                dest_content_path = os.path.join(path, member.name)
+                if os.path.exists(dest_content_path) and not getattr(self.options, "force", False):
                     if self.content_type in CONTENT_PLUGIN_TYPES:
                         message = (
-                            "the specified Galaxy Content %s appears to already exist." % os.path.join(path, member.name),
+                            "the specified Galaxy Content %s appears to already exist." % dest_content_path,
                             "Use of --force for non-role Galaxy Content Type is not yet supported"
                         )
                         if self._install_all_content:
@@ -536,7 +555,7 @@ class GalaxyContent(object):
                         else:
                             raise exceptions.GalaxyClientError(" ".join(message))
                     else:
-                        message = "the specified role %s appears to already exist. Use --force to replace it." % self.content.name
+                        message = "the specified role %s appears to already exist at %s. Use --force to replace it." % (self.content.name, dest_content_path)
                         if self._install_all_content:
                             # FIXME - Probably a better way to handle this
                             self.display_callback(message, level='warning')
@@ -544,7 +563,7 @@ class GalaxyContent(object):
                             raise exceptions.GalaxyClientError(message)
 
                 # Alright, *now* actually write the file
-                self.log.debug('Extracting member=%s, path=%s', member, path)
+                # self.log.debug('Extracting member=%s, path=%s', member, path)
                 tar_file.extract(member, path)
 
                 # Reset the name so we're on equal playing field for the sake of
@@ -828,10 +847,13 @@ class GalaxyContent(object):
                                 os.makedirs(self.path)
 
                             tar_file_members = content_tar_file.getmembers()
-                            member_matches = [tar_file_member for tar_file_member in tar_file_members if tar_info_content_name_match(tar_file_member, content_name)]
+                            member_matches = [tar_file_member for tar_file_member in tar_file_members
+                                              if tar_info_content_name_match(tar_file_member, match_pattern='*roles/*')]
+                            tar_file_members = change_tar_members_prefix(tar_file_members, old_prefix_regex='^.*?\/roles\/', new_prefix='roles/')
                             self.log.debug('member_matches: %s' % member_matches)
-                            self._write_archived_files(content_tar_file, archive_parent_dir, files_to_extract=member_matches,
-                                                        extract_to_path=self.content.path)
+                            self.log.debug('archive_parent_dir=%s', archive_parent_dir)
+                            self._write_archived_files(content_tar_file, '/home/adrian/.ansible/content/', files_to_extract=member_matches,
+                                                      extract_to_path='/home/adrian/.ansible/content')
 
                             # self._write_archived_files(content_tar_file, archive_parent_dir)
 
