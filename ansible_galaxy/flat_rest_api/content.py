@@ -75,6 +75,46 @@ def tar_info_content_name_match(tar_info, content_name, content_path=None):
     return False
 
 
+def get_content_version(content_data, version, content_versions, content_content_name):
+    '''find and compare content version found in content_data dict
+
+    content_data is a dict based on /api/v1/content/13 for ex
+    content_content_data is the name of the content specified by user?
+    version is the currently set version?
+    content_versions is ?
+    '''
+    log.debug('content_data: %s', content_data)
+    log.debug('version: %s', version)
+    log.debug('content_versions: %s', content_versions)
+    log.debug('content_content_name: %s', content_content_name)
+
+    if version and version != 'master':
+        if content_versions and str(version) not in [a.get('name', None) for a in content_versions]:
+            msg = "- the specified version (%s) of %s was not found in the list of available versions (%s)." % \
+                (version, content_content_name, content_versions)
+            raise exceptions.GalaxyError(msg)
+    # and sort them to get the latest version. If there
+    # are no versions in the list, we'll grab the head
+    # of the master branch
+    if len(content_versions) > 0:
+        loose_versions = [LooseVersion(a.get('name', None)) for a in content_versions]
+        try:
+            loose_versions.sort()
+        except TypeError:
+            raise exceptions.GalaxyClientError(
+                'Unable to compare content versions (%s) to determine the most recent version due to incompatible version formats. '
+                'Please contact the content author to resolve versioning conflicts, or specify an explicit content version to '
+                'install.' % ', '.join([v.vstring for v in loose_versions])
+            )
+        content_version = str(loose_versions[-1])
+    # FIXME: follow 'repository' branch and it's ['import_branch'] ?
+    elif content_data.get('github_branch', None):
+        content_version = content_data['github_branch']
+    else:
+        content_version = 'master'
+    return content_version
+
+
 class GalaxyContent(object):
 
     SUPPORTED_SCMS = set(['git', 'hg'])
@@ -428,7 +468,7 @@ class GalaxyContent(object):
 
         if file_name:
             files_to_extract.append(file_name)
-        self.log.debug('files_to_extract: %s', files_to_extract)
+        # self.log.debug('files_to_extract: %s', files_to_extract)
 
         path = extract_to_path or self.path
 
@@ -440,8 +480,8 @@ class GalaxyContent(object):
             # file
             orig_name = member.name
             # self.log.debug('member.name=%s', member.name)
-            self.log.debug('member=%s, orig_name=%s, member.isreg()=%s member.issym()=%s',
-                           member, orig_name, member.isreg(), member.issym())
+            #self.log.debug('member=%s, orig_name=%s, member.isreg()=%s member.issym()=%s',
+            #               member, orig_name, member.isreg(), member.issym())
             # we only extract files, and remove any relative path
             # bits that might be in the file for security purposes
             # and drop any containing directory, as mentioned above
@@ -450,15 +490,15 @@ class GalaxyContent(object):
             if member.isreg() or member.issym():
                 parts_list = member.name.split(os.sep)
 
-                self.log.debug('content_type: %s', self.content_type)
+                # self.log.debug('content_type: %s', self.content_type)
                 # filter subdirs if provided
                 if self.content_type != "role":
                     # Check if the member name (path), minus the tar
                     # archive baseir starts with a subdir we're checking
                     # for
-                    self.log.debug('parts_list: %s', parts_list)
-                    self.log.debug('parts_list[1]: %s', parts_list[1])
-                    self.log.debug('CONTENT_TYPE_DIR_MAP[self.content_type]: %s', CONTENT_TYPE_DIR_MAP[self.content_type])
+                    # self.log.debug('parts_list: %s', parts_list)
+                    # self.log.debug('parts_list[1]: %s', parts_list[1])
+                    # self.log.debug('CONTENT_TYPE_DIR_MAP[self.content_type]: %s', CONTENT_TYPE_DIR_MAP[self.content_type])
                     if file_name:
                         # The parent_dir passed in when a file name is specified
                         # should be the full path to the file_name as defined in the
@@ -472,11 +512,11 @@ class GalaxyContent(object):
                     elif len(parts_list) > 1 and parts_list[1] == CONTENT_TYPE_DIR_MAP[self.content_type]:
                         plugin_found = CONTENT_TYPE_DIR_MAP[self.content_type]
 
-                    self.log.debug('plugin_found1: %s', plugin_found)
+                    # self.log.debug('plugin_found1: %s', plugin_found)
                     if not plugin_found:
                         continue
 
-                self.log.debug('plugin_found2: %s', plugin_found)
+                # self.log.debug('plugin_found2: %s', plugin_found)
                 if plugin_found:
                     # If this is not a role, we don't expect it to be installed
                     # into a subdir under roles path but instead directly
@@ -499,14 +539,14 @@ class GalaxyContent(object):
                             continue
                 else:
                     parts = member.name.replace(parent_dir, "", 1).split(os.sep)
-                    self.log.debug('plugin_found falsey, building parts: %s', parts)
+                    # self.log.debug('plugin_found falsey, building parts: %s', parts)
 
                 final_parts = []
                 for part in parts:
                     if part != '..' and '~' not in part and '$' not in part:
                         final_parts.append(part)
                 member.name = os.path.join(*final_parts)
-                self.log.debug('final_parts: %s', final_parts)
+                # self.log.debug('final_parts: %s', final_parts)
 
                 if self.content_type in CONTENT_PLUGIN_TYPES:
                     self.display_callback(
@@ -533,7 +573,7 @@ class GalaxyContent(object):
                             raise exceptions.GalaxyClientError(message)
 
                 # Alright, *now* actually write the file
-                self.log.debug('Extracting member=%s, path=%s', member, path)
+                # self.log.debug('Extracting member=%s, path=%s', member, path)
                 tar_file.extract(member, path)
 
                 # Reset the name so we're on equal playing field for the sake of
@@ -677,39 +717,21 @@ class GalaxyContent(object):
                 related_versions_url = related.get('versions', None)
                 content_versions = api.fetch_content_related(related_versions_url)
 
+                self.log.debug('content_versions: %s', content_versions)
                 # FIXME: mv to it's own method
-                if not self.version:
-                    # convert the version names to LooseVersion objects
-                    # and sort them to get the latest version. If there
-                    # are no versions in the list, we'll grab the head
-                    # of the master branch
-                    if len(content_versions) > 0:
-                        loose_versions = [LooseVersion(a.get('name', None)) for a in content_versions]
-                        try:
-                            loose_versions.sort()
-                        except TypeError:
-                            raise exceptions.GalaxyClientError(
-                                'Unable to compare content versions (%s) to determine the most recent version due to incompatible version formats. '
-                                'Please contact the content author to resolve versioning conflicts, or specify an explicit content version to '
-                                'install.' % ', '.join([v.vstring for v in loose_versions])
-                            )
-                        self.content.version = str(loose_versions[-1])
-                    # FIXME: follow 'repository' branch and it's ['import_branch'] ?
-                    elif content_data.get('github_branch', None):
-                        self.content.version = content_data['github_branch']
-                    else:
-                        self.content.version = 'master'
-                elif self.version != 'master':
-                    if content_versions and str(self.version) not in [a.get('name', None) for a in content_versions]:
-                        raise exceptions.GalaxyError(
-                            "- the specified version (%s) of %s was not found in the list of available versions (%s)." % (self.version,
-                                                                                                                          self.content.name,
-                                                                                                                          content_versions))
+                content_version = get_content_version(content_data,
+                                                      version=self.version,
+                                                      content_versions=content_versions,
+                                                      content_content_name=self.content.name)
+
+                # FIXME: stop munging state
+                self.content.version = content_version
+
                 related_repo_url = related.get('repository', None)
                 content_repo = None
                 if related_repo_url:
                     content_repo = api.fetch_content_related(related_repo_url)
-                self.log.debug('content_repo: %s', content_repo)
+                # self.log.debug('content_repo: %s', content_repo)
 
                 external_url = content_repo.get('external_url', None)
                 if external_url:
@@ -772,7 +794,7 @@ class GalaxyContent(object):
                                 else:
                                     meta_file = member
 
-                self.log.debug('self.content_type: %s', self.content_type)
+                # self.log.debug('self.content_type: %s', self.content_type)
 
                 # content types like 'module' shouldn't care about meta_file elsewhere
                 if self.content_type in self.NO_META:
@@ -818,8 +840,8 @@ class GalaxyContent(object):
                             raise exceptions.GalaxyClientError(msg)
 
                 self.log.debug("meta_file: %s galaxy_file: %s self.content_type: %s", meta_file, galaxy_file, self.content_type)
-                self.log.debug("archive_parent_dir: %s", archive_parent_dir)
-                self.log.debug("meta_parent_dir: %s", meta_parent_dir)
+                # self.log.debug("archive_parent_dir: %s", archive_parent_dir)
+                # self.log.debug("meta_parent_dir: %s", meta_parent_dir)
                 if not meta_file and not galaxy_file and self.content_type == "role":
                     raise exceptions.GalaxyClientError("this role does not appear to have a meta/main.yml file or ansible-galaxy.yml.")
                 # FIXME: unindent
@@ -875,7 +897,7 @@ class GalaxyContent(object):
                             #        It is almost similar to a url rewrite engine. Or really, persisting of some object that was loaded from a DTO
                             tar_file_members = content_tar_file.getmembers()
                             member_matches = [tar_file_member for tar_file_member in tar_file_members if tar_info_content_name_match(tar_file_member, content_name)]
-                            self.log.debug('member_matches: %s' % member_matches)
+                            # self.log.debug('member_matches: %s' % member_matches)
                             self._write_archived_files(content_tar_file, archive_parent_dir, files_to_extract=member_matches,
                                                         extract_to_path=self.content.path)
 
