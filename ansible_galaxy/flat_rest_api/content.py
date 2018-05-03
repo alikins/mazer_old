@@ -124,10 +124,6 @@ class GalaxyContent(object):
 
         self.content = content.GalaxyContentMeta(name=name, src=src, version=version,
                                                  scm=scm, path=path, content_type=content_type)
-        # self.name = name
-        # self.version = version
-        # self.src = src or name
-        # self.scm = scm
 
         # TODO: remove this when the data constructors are split
         # This is a marker needed to make certain decisions about single
