@@ -30,11 +30,11 @@ import logging
 import os
 from shutil import rmtree
 import tarfile
-import tempfile
 import yaml
 
 from ansible_galaxy.flat_rest_api.api import GalaxyAPI
 from ansible_galaxy.config import defaults
+from ansible_galaxy import download
 from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
 from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP
@@ -44,8 +44,6 @@ from ansible_galaxy.models import content_version
 from ansible_galaxy.utils.yaml_parse import yaml_parse
 from ansible_galaxy.utils.content_name import parse_content_name
 
-
-from ansible_galaxy.flat_rest_api.urls import open_url
 
 log = logging.getLogger(__name__)
 
@@ -571,11 +569,15 @@ class GalaxyContent(object):
 
         return False
 
-    def _build_download_url(self, content_data, external_url, src, version):
+    def _build_download_url(self, content_data, src, external_url=None, version=None):
         # self.log.debug('fetch content_data=%s', json.dumps(content_data, indent=4))
         if not content_data:
             # FIXME: should raise an exception? maybe an assert
             return False
+
+        if external_url and version:
+            archive_url = '%s/archive/%s.tar.gz' % (external_url, version)
+            return archive_url
 
         archive_url = src
 
@@ -584,36 +586,84 @@ class GalaxyContent(object):
         if "github_user" in content_data and "github_repo" in content_data:
             archive_url = 'https://github.com/%s/%s/archive/%s.tar.gz' % (content_data["github_user"], content_data["github_repo"], self.version)
 
-        if external_url:
-            archive_url = '%s/archive/%s.tar.gz' % (external_url, version)
-
         return archive_url
 
-    # FIXME: let the archive_url be passed in
-    def fetch(self, content_data, external_url=None):
-        """
-        Downloads the archived content from github to a temp location
-        """
-        archive_url = self._build_download_url(content_data, external_url, self.src, self.version)
+    def fetch(self, content_data, version=None, external_url=None):
+        '''Build a download url and downloads the archived content from github to a temp location'''
+
+        import json
+        self.log.debug('content_data=%s', json.dumps(content_data, indent=4))
+        archive_url = self._build_download_url(content_data, self.src,
+                                               external_url=external_url,
+                                               version=version)
         self.log.debug('self.src=%s archive_url=%s', self.src, archive_url)
 
         self.display_callback("- downloading content from %s" % archive_url)
 
         try:
-            url_file = open_url(archive_url, validate_certs=self._validate_certs)
-            temp_file = tempfile.NamedTemporaryFile(delete=False)
-            data = url_file.read()
-            while data:
-                temp_file.write(data)
-                data = url_file.read()
-            temp_file.close()
-            return temp_file.name
-        except Exception as e:
-            # FIXME: there is a ton of reasons a download and save could fail so could likely provided better errors here
+            temp_file = download.fetch_url(archive_url, validate_certs=self._validate_certs)
+        except exceptions.GalaxyDownloadError as e:
             self.log.exception(e)
-            self.display_callback("failed to download the file: %s" % str(e), level='error')
+            self.display_callback("failed to download the file: %s" % str(e))
+            return None
 
-        return False
+        return temp_file
+
+    # tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
+    # FIXME: not a great name
+    def get_content_archive_via_galaxy(self, scm_url=None, src=None, content_name=None,
+                                       galaxy_context=None, version=None):
+        # FIXME: all this stuff that hits galaxy api to eventually find the archive url should be extract elsewhere
+        api = GalaxyAPI(galaxy_context)
+
+        # FIXME - Need to update our API calls once Galaxy has them implemented
+        content_username, repo_name, content_name = parse_content_name(src)
+
+        self.log.debug('content_username=%s, repo_name=%s content_name=%s', content_username, repo_name, content_name)
+
+        # TODO: extract parsing of cli content sorta-url thing and add better tests
+        repo_name = repo_name or content_name
+        content_data = api.lookup_content_repo_by_name(content_username, repo_name)
+        if not content_data:
+            raise exceptions.GalaxyClientError("- sorry, %s was not found on %s." % (src, api.api_server))
+
+        if content_data.get('role_type') == 'APP':
+            # Container Role
+            self.display_callback("%s is a Container App role, and should only be installed using Ansible "
+                                  "Container" % content_name, level='warning')
+
+        # FIXME - Need to update our API calls once Galaxy has them implemented
+        related = content_data.get('related', {})
+        related_versions_url = related.get('versions', None)
+        content_versions = api.fetch_content_related(related_versions_url)
+
+        self.log.debug('content_versions: %s', content_versions)
+
+        related_repo_url = related.get('repository', None)
+        content_repo = None
+        if related_repo_url:
+            content_repo = api.fetch_content_related(related_repo_url)
+        # self.log.debug('content_repo: %s', content_repo)
+        # FIXME: mv to it's own method
+        # FIXME: pass these to fetch() if it really needs it
+        _content_version = content_version.get_content_version(content_data,
+                                                               version=version,
+                                                               content_versions=content_versions,
+                                                               content_content_name=content_name)
+
+        # FIXME: stop munging state
+        self.content_meta.version = _content_version
+
+        external_url = content_repo.get('external_url', None)
+        if external_url:
+            tmp_file = self.fetch(content_data,
+                                  version=_content_version,
+                                  external_url=external_url)
+        else:
+            tmp_file = self.fetch(content_data, version=_content_version)
+
+        # TODO: need an class for this info
+        return content_data, content_versions, tmp_file
 
     # TODO: split this up, it's pretty gnarly
     def install(self):
@@ -663,49 +713,8 @@ class GalaxyContent(object):
                 content_data = self.src
                 tmp_file = self.fetch(content_data)
             else:
-                # FIXME: all this stuff that hits galaxy api to eventually find the archive url should be extract elsewhere
-                api = GalaxyAPI(self.galaxy)
-                # FIXME - Need to update our API calls once Galaxy has them implemented
-                content_username, repo_name, content_name = parse_content_name(self.src)
-                self.log.debug('content_username=%s, repo_name=%s content_name=%s', content_username, repo_name, content_name)
-                # TODO: extract parsing of cli content sorta-url thing and add better tests
-                repo_name = repo_name or content_name
-                content_data = api.lookup_content_repo_by_name(content_username, repo_name)
-                if not content_data:
-                    raise exceptions.GalaxyClientError("- sorry, %s was not found on %s." % (self.src, api.api_server))
+                content_data, content_versions, tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
 
-                if content_data.get('role_type') == 'APP':
-                    # Container Role
-                    self.display_callback("%s is a Container App role, and should only be installed using Ansible "
-                                          "Container" % self.content_meta.name, level='warning')
-
-                # FIXME - Need to update our API calls once Galaxy has them implemented
-                related = content_data.get('related', {})
-                related_versions_url = related.get('versions', None)
-                content_versions = api.fetch_content_related(related_versions_url)
-
-                self.log.debug('content_versions: %s', content_versions)
-                # FIXME: mv to it's own method
-                # FIXME: pass these to fetch() if it really needs it
-                _content_version = content_version.get_content_version(content_data,
-                                                                       version=self.version,
-                                                                       content_versions=content_versions,
-                                                                       content_content_name=self.content_meta.name)
-
-                # FIXME: stop munging state
-                self.content_meta.version = _content_version
-
-                related_repo_url = related.get('repository', None)
-                content_repo = None
-                if related_repo_url:
-                    content_repo = api.fetch_content_related(related_repo_url)
-                # self.log.debug('content_repo: %s', content_repo)
-
-                external_url = content_repo.get('external_url', None)
-                if external_url:
-                    tmp_file = self.fetch(content_data, external_url)
-                else:
-                    tmp_file = self.fetch(content_data)
 
         else:
             raise exceptions.GalaxyClientError("No valid content data found")
