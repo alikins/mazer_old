@@ -683,10 +683,10 @@ class GalaxyContent(object):
 
                 self.log.debug('content_versions: %s', content_versions)
                 # FIXME: mv to it's own method
-                _content_version = content_version. get_content_version(content_data,
-                                                                        version=self.version,
-                                                                        content_versions=content_versions,
-                                                                        content_content_name=self.content_meta.name)
+                _content_version = content_version.get_content_version(content_data,
+                                                                       version=self.version,
+                                                                       content_versions=content_versions,
+                                                                       content_content_name=self.content_meta.name)
 
                 # FIXME: stop munging state
                 self.content_meta.version = _content_version
