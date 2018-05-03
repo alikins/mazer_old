@@ -571,18 +571,13 @@ class GalaxyContent(object):
 
         return False
 
-    # FIXME: let the archive_url be passed in
-    def fetch(self, content_data, external_url=None):
-        """
-        Downloads the archived content from github to a temp location
-        """
-
+    def _build_download_url(self, content_data, external_url, src, version):
         # self.log.debug('fetch content_data=%s', json.dumps(content_data, indent=4))
         if not content_data:
             # FIXME: should raise an exception? maybe an assert
             return False
 
-        archive_url = self.src
+        archive_url = src
 
         # FIXME: 'github_user'/'github_repo' dont exist in v3 API
         # first grab the file and save it to a temp location
@@ -590,8 +585,16 @@ class GalaxyContent(object):
             archive_url = 'https://github.com/%s/%s/archive/%s.tar.gz' % (content_data["github_user"], content_data["github_repo"], self.version)
 
         if external_url:
-            archive_url = '%s/archive/%s.tar.gz' % (external_url, self.version)
+            archive_url = '%s/archive/%s.tar.gz' % (external_url, version)
 
+        return archive_url
+
+    # FIXME: let the archive_url be passed in
+    def fetch(self, content_data, external_url=None):
+        """
+        Downloads the archived content from github to a temp location
+        """
+        archive_url = self._build_download_url(content_data, external_url, self.src, self.version)
         self.log.debug('self.src=%s archive_url=%s', self.src, archive_url)
 
         self.display_callback("- downloading content from %s" % archive_url)
@@ -683,6 +686,7 @@ class GalaxyContent(object):
 
                 self.log.debug('content_versions: %s', content_versions)
                 # FIXME: mv to it's own method
+                # FIXME: pass these to fetch() if it really needs it
                 _content_version = content_version.get_content_version(content_data,
                                                                        version=self.version,
                                                                        content_versions=content_versions,
