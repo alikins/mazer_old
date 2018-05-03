@@ -261,7 +261,7 @@ class GalaxyContent(object):
             # singular of type between the contants vars read in from the config
             # file and the subdirectories
             if new_content_type != "all":
-                self.log.debug('ctdm: %s', json.dumps(CONTENT_TYPE_DIR_MAP, indent=4))
+                # self.log.debug('ctdm: %s', json.dumps(CONTENT_TYPE_DIR_MAP, indent=4))
                 galaxy_content_paths = [os.path.join(os.path.expanduser(p),
                                                      CONTENT_TYPE_DIR_MAP[new_content_type]) for p in defaults.DEFAULT_CONTENT_PATH]
             else:
