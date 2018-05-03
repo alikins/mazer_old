@@ -848,18 +848,21 @@ class GalaxyContent(object):
                                     # using --force, remove the old path
                                     # FIXME: this is ~10 indent levels deep in the 'install' method which is a weird place to do a remove
                                     if not self.remove():
-                                        raise exceptions.GalaxyClientError("%s doesn't appear to contain a role.\n  please remove this directory manually if you really "
-                                                        "want to put the role here." % self.path)
+                                        msg = "%s doesn't appear to contain a role.\n"
+                                        "iplease remove this directory manually if you really "
+                                        "want to put the role here" % self.content_meta.path
+                                        raise exceptions.GalaxyClientError(msg)
                             else:
                                 os.makedirs(self.path)
 
                             # FIXME: not sure of best approach/pattern to figuring out how/where to extract the content too
                             #        It is almost similar to a url rewrite engine. Or really, persisting of some object that was loaded from a DTO
                             tar_file_members = content_tar_file.getmembers()
-                            member_matches = [tar_file_member for tar_file_member in tar_file_members if tar_info_content_name_match(tar_file_member, self.content_meta.name)]
+                            member_matches = [tar_member for tar_member in tar_file_members
+                                              if tar_info_content_name_match(tar_member, self.content_meta.name)]
                             # self.log.debug('member_matches: %s' % member_matches)
                             self._write_archived_files(content_tar_file, archive_parent_dir, files_to_extract=member_matches,
-                                                        extract_to_path=self.content_meta.path)
+                                                       extract_to_path=self.content_meta.path)
 
                             # self._write_archived_files(content_tar_file, archive_parent_dir)
 
