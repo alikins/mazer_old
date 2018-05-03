@@ -578,36 +578,37 @@ class GalaxyContent(object):
         """
 
         # self.log.debug('fetch content_data=%s', json.dumps(content_data, indent=4))
-        # FIXME: return early if content_data is falsey and unindent
-        if content_data:
+        if not content_data:
+            # FIXME: should raise an exception? maybe an assert
+            return False
 
-            archive_url = self.src
+        archive_url = self.src
 
-            # FIXME: 'github_user'/'github_repo' dont exist in v3 API
-            # first grab the file and save it to a temp location
-            if "github_user" in content_data and "github_repo" in content_data:
-                archive_url = 'https://github.com/%s/%s/archive/%s.tar.gz' % (content_data["github_user"], content_data["github_repo"], self.version)
+        # FIXME: 'github_user'/'github_repo' dont exist in v3 API
+        # first grab the file and save it to a temp location
+        if "github_user" in content_data and "github_repo" in content_data:
+            archive_url = 'https://github.com/%s/%s/archive/%s.tar.gz' % (content_data["github_user"], content_data["github_repo"], self.version)
 
-            if external_url:
-                archive_url = '%s/archive/%s.tar.gz' % (external_url, self.version)
+        if external_url:
+            archive_url = '%s/archive/%s.tar.gz' % (external_url, self.version)
 
-            self.log.debug('self.src=%s archive_url=%s', self.src, archive_url)
+        self.log.debug('self.src=%s archive_url=%s', self.src, archive_url)
 
-            self.display_callback("- downloading content from %s" % archive_url)
+        self.display_callback("- downloading content from %s" % archive_url)
 
-            try:
-                url_file = open_url(archive_url, validate_certs=self._validate_certs)
-                temp_file = tempfile.NamedTemporaryFile(delete=False)
+        try:
+            url_file = open_url(archive_url, validate_certs=self._validate_certs)
+            temp_file = tempfile.NamedTemporaryFile(delete=False)
+            data = url_file.read()
+            while data:
+                temp_file.write(data)
                 data = url_file.read()
-                while data:
-                    temp_file.write(data)
-                    data = url_file.read()
-                temp_file.close()
-                return temp_file.name
-            except Exception as e:
-                # FIXME: there is a ton of reasons a download and save could fail so could likely provided better errors here
-                self.log.exception(e)
-                self.display_callback("failed to download the file: %s" % str(e), level='error')
+            temp_file.close()
+            return temp_file.name
+        except Exception as e:
+            # FIXME: there is a ton of reasons a download and save could fail so could likely provided better errors here
+            self.log.exception(e)
+            self.display_callback("failed to download the file: %s" % str(e), level='error')
 
         return False
 
