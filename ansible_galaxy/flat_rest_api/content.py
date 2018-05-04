@@ -611,35 +611,6 @@ class GalaxyContent(object):
 
     # TODO: split this up, it's pretty gnarly
     def install(self):
-
-        # ContentArchive
-        #   path: None
-        #   scm_info: ScmInfo()
-        #   galaxy_content:
-        #     username
-        #     namespace
-        #     repo_name
-        #     content_name
-        #     versions: []
-        #     repository:
-        #       external_url:
-        #     scm_branch: ?
-        #     archive_url:
-        #   contents:
-        #    - name: content1
-        #      meta_file:
-        #        role_name:
-        #        version:
-        #        deps:
-        #      galaxy_metadata:
-        #        whichever_data:
-        #        other_ansible_galaxy_yml_data:
-        #      path_in_archive:
-        #      path_to_install_to:
-        #      content_type:
-        #    - name: content2
-        #      <..>
-        #
         # TODO: some useful exceptions for 'cant find', 'cant read', 'cant write'
         fetch_method = choose_content_fetch_method(scm_url=self.scm, src=self.src)
 
@@ -667,26 +638,23 @@ class GalaxyContent(object):
             content_archive = fetcher.fetch()
             self.log.debug('content_archive=%s', content_archive)
 
-            # FIXME: rm
-            tmp_file = content_archive
-
         if not content_archive:
             raise exceptions.GalaxyClientError('No valid content data found for %s', self.src)
 
         # FIXME: the 'fetch', persist locally,  and 'install' steps should not be combined here
         # FIXME: mv to own method[s], unindent
-        if tmp_file:
+        if content_archive:
 
-            self.log.debug("installing from %s", tmp_file)
+            self.log.debug("installing from %s", content_archive)
 
             # FIXME: unindent the non error else here
-            if not tarfile.is_tarfile(tmp_file):
+            if not tarfile.is_tarfile(content_archive):
                 raise exceptions.GalaxyClientError("the file downloaded was not a tar.gz")
             else:
-                if tmp_file.endswith('.gz'):
-                    content_tar_file = tarfile.open(tmp_file, "r:gz")
+                if content_archive.endswith('.gz'):
+                    content_tar_file = tarfile.open(content_archive, "r:gz")
                 else:
-                    content_tar_file = tarfile.open(tmp_file, "r")
+                    content_tar_file = tarfile.open(content_archive, "r")
                 # verify the role's meta file
 
                 meta_file = None
@@ -694,7 +662,7 @@ class GalaxyContent(object):
                 archive_parent_dir = None
                 members = content_tar_file.getmembers()
                 # import pprint
-                # self.log.debug('tmp_file (%s) members: %s', tmp_file, pprint.pformat(members))
+                # self.log.debug('content_archive (%s) members: %s', content_archive, pprint.pformat(members))
                 # next find the metadata file
 
                 # FIXME: mv to method or ditch entirely and drive from a iterable of files to extract and save
@@ -787,7 +755,7 @@ class GalaxyContent(object):
                         # else:
                         # FIXME - Need to handle the scenario where we "walk the dirs" and place things where they should be
                     except Exception as e:
-                        self.warn('unable to extract and yaml load galaxy_file=%s meta_file=%s tmpfile=%s', galaxy_file, meta_file, tmp_file)
+                        self.warn('unable to extract and yaml load galaxy_file=%s meta_file=%s tmpfile=%s', galaxy_file, meta_file, content_archive)
                         self.log.exception(e)
                         raise exceptions.GalaxyClientError("this role does not appear to have a valid meta/main.yml or ansible-galaxy.yml file.")
 
