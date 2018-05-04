@@ -36,11 +36,13 @@ from ansible_galaxy.flat_rest_api.api import GalaxyAPI
 from ansible_galaxy.config import defaults
 from ansible_galaxy import download
 from ansible_galaxy import exceptions
+from ansible_galaxy.fetch.scm_url import ScmUrlFetch
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
 from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP
 from ansible_galaxy.models import content
 from ansible_galaxy.models import content_repository
 from ansible_galaxy.models import content_version
+from ansible_galaxy.utils import scm_archive
 from ansible_galaxy.utils.yaml_parse import yaml_parse
 from ansible_galaxy.utils.content_name import parse_content_name
 
@@ -70,6 +72,35 @@ def tar_info_content_name_match(tar_info, content_name, content_path=None):
         return True
 
     return False
+
+def choose_content_fetch_method(scm_url=None, src=None, galaxy_context=None, spec=None):
+    fetch_method = None
+    log.debug('scm_url=%s, src=%s, galaxy_context=%s, spec=%s',
+              scm_url, src, galaxy_context, spec)
+    spec = spec or {}
+    if scm_url:
+        # create tar file from scm url
+        fetch_method = ScmUrlFetch(scm_url=scm_url, scm_spec=spec)
+        return fetch_method
+
+    if src:
+        if os.path.isfile(src):
+            # installing a local tar.gz
+            # local_file = True
+            tmp_file = src
+            fetch_method = 'local_file'
+            # FIXME: not sure I understand content_data=src? guess that is just 'here is a url'
+        elif '://' in src:
+            # content_data = src
+            # tmp_file = self.fetch(content_data)
+            fetch_method = 'remote_url'
+        else:
+            # content_data, content_versions, tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
+            fetch_method = 'galaxy'
+
+        return fetch_method
+
+    raise exceptions.GalaxyClientError("No valid content data found")
 
 
 # FIXME: really just three methods here, install, remove, fetch. install -> save, fetch -> load
@@ -701,9 +732,22 @@ class GalaxyContent(object):
         #
         # FIXME: this is loading and persisting the archive and should be extract to another class/method
         # FIXME: the exception case is no self.scm and no self.src, so detect that early and raise then unindent
+        # TODO: need an interface for 'get a content archive' with impls for
+        #       galaxy server, local scm, local archive, other?
+        #       - some factory-ish method to select the right one.
+        #       - api would be more or less what self.fetch() does
+        #       - some useful exceptions for 'cant find', 'cant read', 'cant write'
+        fetch_method = choose_content_fetch_method(scm_url=self.scm, src=self.src,
+                                                   galaxy_context=self.galaxy, spec=self.spec)
+        # content_archive = fetch_method()
+        # if not content_archive:
+        #     return False
+        self.log.debug('fetch_method: %s', fetch_method)
+
         if self.scm:
             # create tar file from scm url
-            tmp_file = GalaxyContent.scm_archive_content(**self.spec)
+            # tmp_file = GalaxyContent.scm_archive_content(**self.spec)
+            tmp_file = scm_archive.scm_archive_content(**self.spec)
         elif self.src:
             if os.path.isfile(self.src):
                 # installing a local tar.gz
@@ -714,10 +758,10 @@ class GalaxyContent(object):
                 tmp_file = self.fetch(content_data)
             else:
                 content_data, content_versions, tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
-
-
         else:
             raise exceptions.GalaxyClientError("No valid content data found")
+
+        # tmp_file = content_archive
 
         # FIXME: the 'fetch', persist locally,  and 'install' steps should not be combined here
         # FIXME: mv to own method[s], unindent
