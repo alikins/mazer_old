@@ -32,19 +32,17 @@ from shutil import rmtree
 import tarfile
 import yaml
 
-from ansible_galaxy.flat_rest_api.api import GalaxyAPI
 from ansible_galaxy.config import defaults
-from ansible_galaxy import download
 from ansible_galaxy import exceptions
 from ansible_galaxy.fetch.scm_url import ScmUrlFetch
+from ansible_galaxy.fetch.local_file import LocalFileFetch
+from ansible_galaxy.fetch.remote_url import RemoteUrlFetch
+from ansible_galaxy.fetch.galaxy_url import GalaxyUrlFetch
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
 from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP
 from ansible_galaxy.models import content
 from ansible_galaxy.models import content_repository
-from ansible_galaxy.models import content_version
-from ansible_galaxy.utils import scm_archive
 from ansible_galaxy.utils.yaml_parse import yaml_parse
-from ansible_galaxy.utils.content_name import parse_content_name
 
 
 log = logging.getLogger(__name__)
@@ -73,35 +71,37 @@ def tar_info_content_name_match(tar_info, content_name, content_path=None):
 
     return False
 
-def choose_content_fetch_method(scm_url=None, src=None, galaxy_context=None, spec=None):
-    fetch_method = None
-    log.debug('scm_url=%s, src=%s, galaxy_context=%s, spec=%s',
-              scm_url, src, galaxy_context, spec)
-    spec = spec or {}
+
+# FIXME: do we have an enum like class for py2.6? worth a dep?
+class FetchMethods(object):
+    SCM_URL = 'SCM_URL'
+    LOCAL_FILE = 'LOCAL_FILE'
+    REMOTE_URL = 'REMOTE_URL'
+    GALAXY_URL = 'GALAXY_URL'
+
+
+def choose_content_fetch_method(scm_url=None, src=None):
+    log.debug('scm_url=%s, src=%s', scm_url, src)
     if scm_url:
         # create tar file from scm url
-        fetch_method = ScmUrlFetch(scm_url=scm_url, scm_spec=spec)
-        return fetch_method
+        return FetchMethods.SCM_URL
 
-    if src:
-        if os.path.isfile(src):
-            # installing a local tar.gz
-            # local_file = True
-            tmp_file = src
-            fetch_method = 'local_file'
-            # FIXME: not sure I understand content_data=src? guess that is just 'here is a url'
-        elif '://' in src:
-            # content_data = src
-            # tmp_file = self.fetch(content_data)
-            fetch_method = 'remote_url'
-        else:
-            # content_data, content_versions, tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
-            fetch_method = 'galaxy'
+    if not src:
+        raise exceptions.GalaxyClientError("No valid content data found")
 
-        return fetch_method
+    if os.path.isfile(src):
+        # installing a local tar.gz
+        return FetchMethods.LOCAL_FILE
 
-    raise exceptions.GalaxyClientError("No valid content data found")
+    if '://' in src:
+        return FetchMethods.REMOTE_URL
 
+    # if it doesnt look like anything else, assume it's galaxy
+    return FetchMethods.GALAXY_URL
+
+
+#        fetch_method = ScmUrlFetch(scm_url=scm_url, scm_spec=spec)
+#        return fetch_method
 
 # FIXME: really just three methods here, install, remove, fetch. install -> save, fetch -> load
 #       remove -> delete
@@ -600,107 +600,17 @@ class GalaxyContent(object):
 
         return False
 
-    def _build_download_url(self, content_data, src, external_url=None, version=None):
-        # self.log.debug('fetch content_data=%s', json.dumps(content_data, indent=4))
-        if not content_data:
-            # FIXME: should raise an exception? maybe an assert
-            return False
-
+    def _build_download_url(self, src, external_url=None, version=None):
         if external_url and version:
             archive_url = '%s/archive/%s.tar.gz' % (external_url, version)
             return archive_url
 
         archive_url = src
 
-        # FIXME: 'github_user'/'github_repo' dont exist in v3 API
-        # first grab the file and save it to a temp location
-        if "github_user" in content_data and "github_repo" in content_data:
-            archive_url = 'https://github.com/%s/%s/archive/%s.tar.gz' % (content_data["github_user"], content_data["github_repo"], self.version)
-
         return archive_url
-
-    def fetch(self, content_data, version=None, external_url=None):
-        '''Build a download url and downloads the archived content from github to a temp location'''
-
-        import json
-        self.log.debug('content_data=%s', json.dumps(content_data, indent=4))
-        archive_url = self._build_download_url(content_data, self.src,
-                                               external_url=external_url,
-                                               version=version)
-        self.log.debug('self.src=%s archive_url=%s', self.src, archive_url)
-
-        self.display_callback("- downloading content from %s" % archive_url)
-
-        try:
-            temp_file = download.fetch_url(archive_url, validate_certs=self._validate_certs)
-        except exceptions.GalaxyDownloadError as e:
-            self.log.exception(e)
-            self.display_callback("failed to download the file: %s" % str(e))
-            return None
-
-        return temp_file
-
-    # tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
-    # FIXME: not a great name
-    def get_content_archive_via_galaxy(self, scm_url=None, src=None, content_name=None,
-                                       galaxy_context=None, version=None):
-        # FIXME: all this stuff that hits galaxy api to eventually find the archive url should be extract elsewhere
-        api = GalaxyAPI(galaxy_context)
-
-        # FIXME - Need to update our API calls once Galaxy has them implemented
-        content_username, repo_name, content_name = parse_content_name(src)
-
-        self.log.debug('content_username=%s, repo_name=%s content_name=%s', content_username, repo_name, content_name)
-
-        # TODO: extract parsing of cli content sorta-url thing and add better tests
-        repo_name = repo_name or content_name
-        content_data = api.lookup_content_repo_by_name(content_username, repo_name)
-        if not content_data:
-            raise exceptions.GalaxyClientError("- sorry, %s was not found on %s." % (src, api.api_server))
-
-        if content_data.get('role_type') == 'APP':
-            # Container Role
-            self.display_callback("%s is a Container App role, and should only be installed using Ansible "
-                                  "Container" % content_name, level='warning')
-
-        # FIXME - Need to update our API calls once Galaxy has them implemented
-        related = content_data.get('related', {})
-        related_versions_url = related.get('versions', None)
-        content_versions = api.fetch_content_related(related_versions_url)
-
-        self.log.debug('content_versions: %s', content_versions)
-
-        related_repo_url = related.get('repository', None)
-        content_repo = None
-        if related_repo_url:
-            content_repo = api.fetch_content_related(related_repo_url)
-        # self.log.debug('content_repo: %s', content_repo)
-        # FIXME: mv to it's own method
-        # FIXME: pass these to fetch() if it really needs it
-        _content_version = content_version.get_content_version(content_data,
-                                                               version=version,
-                                                               content_versions=content_versions,
-                                                               content_content_name=content_name)
-
-        # FIXME: stop munging state
-        self.content_meta.version = _content_version
-
-        external_url = content_repo.get('external_url', None)
-        if external_url:
-            tmp_file = self.fetch(content_data,
-                                  version=_content_version,
-                                  external_url=external_url)
-        else:
-            tmp_file = self.fetch(content_data, version=_content_version)
-
-        # TODO: need an class for this info
-        return content_data, content_versions, tmp_file
 
     # TODO: split this up, it's pretty gnarly
     def install(self):
-        # the file is a tar, so open it that way and extract it
-        # to the specified (or default) content directory
-        local_file = False
 
         # ContentArchive
         #   path: None
@@ -730,38 +640,38 @@ class GalaxyContent(object):
         #    - name: content2
         #      <..>
         #
-        # FIXME: this is loading and persisting the archive and should be extract to another class/method
-        # FIXME: the exception case is no self.scm and no self.src, so detect that early and raise then unindent
-        # TODO: need an interface for 'get a content archive' with impls for
-        #       galaxy server, local scm, local archive, other?
-        #       - some factory-ish method to select the right one.
-        #       - api would be more or less what self.fetch() does
-        #       - some useful exceptions for 'cant find', 'cant read', 'cant write'
-        fetch_method = choose_content_fetch_method(scm_url=self.scm, src=self.src,
-                                                   galaxy_context=self.galaxy, spec=self.spec)
-        # content_archive = fetch_method()
-        # if not content_archive:
-        #     return False
+        # TODO: some useful exceptions for 'cant find', 'cant read', 'cant write'
+        fetch_method = choose_content_fetch_method(scm_url=self.scm, src=self.src)
+
+        fetcher = None
+        if fetch_method == FetchMethods.SCM_URL:
+            fetcher = ScmUrlFetch(scm_url=self.scm, scm_spec=self.spec)
+        elif fetch_method == FetchMethods.LOCAL_FILE:
+            # the file is a tar, so open it that way and extract it
+            # to the specified (or default) content directory
+            fetcher = LocalFileFetch(self.src)
+        elif fetch_method == FetchMethods.REMOTE_URL:
+            fetcher = RemoteUrlFetch(remote_url=self.src, validate_certs=self._validate_certs)
+        elif fetch_method == FetchMethods.GALAXY_URL:
+            fetcher = GalaxyUrlFetch(content_spec=self.src,
+                                     content_version=self.version,
+                                     galaxy_context=self.galaxy,
+                                     validate_certs=self._validate_certs)
+        else:
+            raise exceptions.GalaxyError('No approriate content fetcher found for %s %s',
+                                         self.scm, self.src)
+
         self.log.debug('fetch_method: %s', fetch_method)
 
-        if self.scm:
-            # create tar file from scm url
-            # tmp_file = GalaxyContent.scm_archive_content(**self.spec)
-            tmp_file = scm_archive.scm_archive_content(**self.spec)
-        elif self.src:
-            if os.path.isfile(self.src):
-                # installing a local tar.gz
-                local_file = True
-                tmp_file = self.src
-            elif '://' in self.src:
-                content_data = self.src
-                tmp_file = self.fetch(content_data)
-            else:
-                content_data, content_versions, tmp_file = self.get_content_archive_via_galaxy(src=self.src, galaxy_context=self.galaxy)
-        else:
-            raise exceptions.GalaxyClientError("No valid content data found")
+        if fetcher:
+            content_archive = fetcher.fetch()
+            self.log.debug('content_archive=%s', content_archive)
 
-        # tmp_file = content_archive
+            # FIXME: rm
+            tmp_file = content_archive
+
+        if not content_archive:
+            raise exceptions.GalaxyClientError('No valid content data found for %s', self.src)
 
         # FIXME: the 'fetch', persist locally,  and 'install' steps should not be combined here
         # FIXME: mv to own method[s], unindent
@@ -1078,13 +988,10 @@ class GalaxyContent(object):
 
                 # return the parsed yaml metadata
                 self.display_callback("- %s was installed successfully" % str(self))
-                if not local_file:
-                    try:
-                        self.log.info("Not removing the tmp_file %s", tmp_file)
-                        # os.unlink(tmp_file)
-                    except (OSError, IOError) as e:
-                        self.warn('Unable to remove tmp file (%s): %s' % (tmp_file, str(e)))
-                        self.display_callback("Unable to remove tmp file (%s): %s" % (tmp_file, str(e)), level='warning')
+
+                # rm any temp files created when getting the content archive
+                fetcher.cleanup()
+
                 return True
 
         return False
