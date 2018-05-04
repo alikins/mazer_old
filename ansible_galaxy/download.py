@@ -13,6 +13,10 @@ def fetch_url(archive_url, validate_certs=True):
     Downloads the archived content from github to a temp location
     """
 
+    # TODO: should probably be based on/shared with rest API client code, so that
+    #       content downloads could support any thing the rest code does
+    #       (ie, any TLS cert setup, proxy config, auth options, etc)
+    # WHEN: if we change the underlying http client impl at least
     try:
         url_file = open_url(archive_url, validate_certs=validate_certs)
         temp_file = tempfile.NamedTemporaryFile(delete=False)
