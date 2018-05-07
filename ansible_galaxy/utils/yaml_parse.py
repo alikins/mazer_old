@@ -10,6 +10,37 @@ from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 log = logging.getLogger(__name__)
 
 
+def parse_content_spec(content_spec_text):
+    '''Given a text/str object describing a galaxy content, parse it.
+
+    And return a dict with keys: 'name', 'src', 'scm', 'version'
+    '''
+    name = None
+    scm = None
+    src = None
+    version = None
+
+    # TODO: tokenizer?
+    if ',' in content_spec_text:
+        if content_spec_text.count(',') == 1:
+            (src, version) = content_spec_text.strip().split(',', 1)
+        elif content_spec_text.count(',') == 2:
+            (src, version, name) = content_spec_text.strip().split(',', 2)
+        else:
+            raise exceptions.GalaxyClientError("Invalid content line (%s). Proper format is 'content_name[,version[,name]]'" % content_spec_text)
+    else:
+        src = content_spec_text
+
+    if name is None:
+        name = repo_url_to_content_name(src)
+        if '+' in src:
+            (scm, src) = src.split('+', 1)
+
+    data = dict(name=name, src=src, scm=scm, version=version)
+    log.debug('parsed content_spec_text="%s" into: %s', content_spec_text, data)
+    return data
+
+
 # FIXME: not really yaml,
 # FIXME: whats the diff between this and role_spec_parse?
 # TODO: return a new GalaxyContentMeta
@@ -28,36 +59,16 @@ def yaml_parse(content):
     #        copy of orig_content as this is just for logging
     #        the original value
 
-    # TODO: move to own method
     if isinstance(content, six.string_types):
         log.debug('parsing content="%s" as a string', content)
         orig_content = copy.deepcopy(content)
-        name = None
-        scm = None
-        src = None
-        version = None
-        if ',' in content:
-            if content.count(',') == 1:
-                (src, version) = content.strip().split(',', 1)
-            elif content.count(',') == 2:
-                (src, version, name) = content.strip().split(',', 2)
-            else:
-                raise exceptions.GalaxyClientError("Invalid content line (%s). Proper format is 'content_name[,version[,name]]'" % content)
-        else:
-            src = content
-
-        if name is None:
-            name = repo_url_to_content_name(src)
-        if '+' in src:
-            (scm, src) = src.split('+', 1)
-
-        data = dict(name=name, src=src, scm=scm, version=version)
-        log.debug('parsed content="%s" into: %s', content, data)
-        return data
+        return parse_content_spec(content)
 
     log.debug('content="%s" is not a string (it is a %s) so we are assuming it is a dict',
               content, type(content))
+
     orig_content = copy.deepcopy(content)
+
     # Not sure what will/should happen if content is not a Mapping or a string
     # FIXME: if content is not a string or a dict/map, throw a reasonable error.
     #        for ex, if a list of strings is passed in, the content.copy() below throws
@@ -67,6 +78,7 @@ def yaml_parse(content):
     # FIXME: what is expected to happen if passed an empty dict?
     if 'role' in content:
         log.debug('content="%s" appears to be a role', content)
+
         name = content['role']
         if ',' in name:
             # Old style: {role: "galaxy.role,version,name", other_vars: "here" }
@@ -104,7 +116,9 @@ def yaml_parse(content):
     for key in list(content.keys()):
         if key not in VALID_ROLE_SPEC_KEYS:
             log.debug('removing invalid key: %s', key)
+
             content.pop(key)
 
     log.debug('"parsed" content="%s" into: %s', orig_content, content)
+
     return content

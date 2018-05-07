@@ -1,10 +1,14 @@
 import logging
 
+from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 from ansible_galaxy.utils import yaml_parse
 
 
 log = logging.getLogger(__name__)
+
+
+# TODO/FIXME: use pytest param fixtures
 
 
 def parse_spec(content_spec):
@@ -186,3 +190,87 @@ def test_yaml_parse_a_comma_sep_style_role_dict_with_name_version():
 
     # FIXME: wtf is 'src' expected to look like here?
     assert_keys(result, name='galaxy.role', version='1.2.4', scm=None, src=src)
+
+
+def parse_content_spec(content_spec):
+    result = yaml_parse.parse_content_spec(content_spec)
+    log.debug('result=%s', result)
+    return result
+
+
+def assert_just_keys(parse_result):
+    valid_keys = ('name', 'src', 'scm', 'version')
+
+    for key in valid_keys:
+        assert key in parse_result, 'expected the results dict to have a "%s" key but it did not' % key
+
+    for result_key in parse_result.keys():
+        assert result_key in valid_keys, 'the results had unexpected key="%s"' % result_key
+
+
+def test_parse_content_spec_src():
+    spec_text = 'some_content'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_content', version=None, scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version():
+    spec_text = 'some_content,1.0.0'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_content', version='1.0.0', scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_name():
+    spec_text = 'some_content,1.0.0,some_name'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_name', version='1.0.0', scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_name_something_invalid():
+    spec_text = 'some_content,1.0.0,some_name,some_garbage'
+    try:
+        parse_content_spec(spec_text)
+    except exceptions.GalaxyClientError:
+        return
+
+    assert False, 'spec_text="%s" should have caused a GalaxyClientError' % spec_text
+
+
+def test_parse_content_spec_src_key_value():
+    spec_text = 'src=some_content'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_content', version=None, scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_key_value():
+    spec_text = 'some_content,version=1.0.0'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_content', version='1.0.0', scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_name_key_value():
+    spec_text = 'some_content,1.0.0,name=some_name'
+    result = parse_content_spec(spec_text)
+
+    assert_just_keys(result)
+    assert_keys(result, name='some_name', version='1.0.0', scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_name_something_invalid_key_value():
+    spec_text = 'some_content,1.0.0,name=some_name,foo=bar,some_garbage'
+    try:
+        parse_content_spec(spec_text)
+    except exceptions.GalaxyClientError:
+        return
+
+    assert False, 'spec_text="%s" should have caused a GalaxyClientError' % spec_text
