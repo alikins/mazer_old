@@ -1,6 +1,8 @@
 import logging
 
+from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 from ansible_galaxy.utils import yaml_parse
+
 
 log = logging.getLogger(__name__)
 
@@ -117,6 +119,26 @@ def test_yaml_parse_a_dict():
     assert_keys(result, name='some_name', version='1.2.4', scm=None, src='galaxy.role')
 
 
+def test_yaml_parse_a_dict_with_extra_invalid_keys():
+    spec = {'name': 'some_name',
+            'version': '1.2.4',
+            'src': 'galaxy.role',
+            'favorite_tea': 'sweet',
+            'module': 'some_module',
+            'url': 'http://example.com/galaxy/foo'}
+    result = parse_spec(spec)
+
+    assert_keys(result, name='some_name', version='1.2.4', scm=None, src='galaxy.role')
+    result_keys = set(result.keys())
+    valid_keys = set(VALID_ROLE_SPEC_KEYS)
+    extra_keys = result_keys.difference(valid_keys)
+    assert not extra_keys, \
+        'Found extra invalid keys in the result. extra_keys=%s, result=%s, valid_keys=%s' % \
+        (extra_keys, result, valid_keys)
+
+    assert_keys(result, name='some_name', version='1.2.4', scm=None, src='galaxy.role')
+
+
 # comments in yaml_parse.py indicate src='galaxy.role,version,name' is supposed to work
 def test_yaml_parse_a_dict_with_conflicts():
     spec = {'name': 'some_name1',
@@ -125,3 +147,42 @@ def test_yaml_parse_a_dict_with_conflicts():
     result = parse_spec(spec)
 
     assert_keys(result, name='some_name2', version='1.0.0', scm=None, src=None)
+
+
+def test_yaml_parse_a_old_style_role_dict():
+    spec = {'role': 'some_role',
+            'version': '1.2.4',
+            'src': 'galaxy.role'}
+    result = parse_spec(spec)
+
+    # FIXME: requiring a different set of asserts to test the results for the role
+    #        case points to this method doing too many things, being passed too many different things,
+    #        and returning too many different things
+    name = 'some_role'
+    src = 'galaxy.role'
+    assert isinstance(result, dict)
+    assert result['name'] == name, \
+        'content_spec name=%s does not match expected name=%s' % (result['name'], name)
+    assert result['version'] == '1.2.4'
+    assert result['src'] == src, \
+        'content_spec src=%s does not match expected src=%s' % (result['src'], src)
+
+
+# FIXME: I'm not real sure what the result of this is supposed to be
+def test_yaml_parse_a_comma_sep_style_role_dict_with_version():
+    src = 'galaxy.role,1.2.4'
+    spec = {'src': src}
+    result = parse_spec(spec)
+
+    # FIXME: wtf is 'src' expected to look like here?
+    assert_keys(result, name='galaxy.role', version='1.2.4', scm=None, src=src)
+
+
+# FIXME: I'm not real sure what the result of this is supposed to be
+def test_yaml_parse_a_comma_sep_style_role_dict_with_name_version():
+    src = 'galaxy.role,1.2.4,some_role'
+    spec = {'src': src}
+    result = parse_spec(spec)
+
+    # FIXME: wtf is 'src' expected to look like here?
+    assert_keys(result, name='galaxy.role', version='1.2.4', scm=None, src=src)
