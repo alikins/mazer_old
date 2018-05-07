@@ -20,25 +20,32 @@ def parse_content_spec(content_spec_text):
     src = None
     version = None
 
-    # TODO: tokenizer?
-    if ',' in content_spec_text:
-        if content_spec_text.count(',') == 1:
-            (src, version) = content_spec_text.strip().split(',', 1)
-        elif content_spec_text.count(',') == 2:
-            (src, version, name) = content_spec_text.strip().split(',', 2)
-        else:
-            raise exceptions.GalaxyClientError("Invalid content line (%s). Proper format is 'content_name[,version[,name]]'" % content_spec_text)
-    else:
-        src = content_spec_text
+    spec_sections = ('src', 'version', 'name')
+    spec_values = {'name': name, 'src': src, 'scm': scm, 'version': version}
 
-    if name is None:
-        name = repo_url_to_content_name(src)
-        if '+' in src:
-            (scm, src) = src.split('+', 1)
+    # This ignores any extra ','
+    parts = content_spec_text.split(',')
+    for section in spec_sections:
+        try:
+            spec_values[section] = parts.pop()
+        except IndexError:
+            continue
+        log.debug('spec_values: %s', spec_values)
 
-    data = dict(name=name, src=src, scm=scm, version=version)
-    log.debug('parsed content_spec_text="%s" into: %s', content_spec_text, data)
-    return data
+    log.debug('spec_values: %s parts: %s', spec_values, parts)
+    if parts:
+        msg = "Invalid content line (%s). Proper format is 'content_name[,version[,name]]'. There were two many commas." \
+            % content_spec_text
+        raise exceptions.GalaxyClientError(msg)
+
+    if spec_values['name'] is None:
+        spec_values['name'] = repo_url_to_content_name(src)
+
+    if spec_values['src'] and '+' in spec_values['src']:
+        (spec_values['scm'], spec_values['src']) = spec_values['src'].split('+', 1)
+
+    log.debug('parsed content_spec_text="%s" into: %s', content_spec_text, spec_values)
+    return spec_values
 
 
 # FIXME: not really yaml,
@@ -62,7 +69,10 @@ def yaml_parse(content):
     if isinstance(content, six.string_types):
         log.debug('parsing content="%s" as a string', content)
         orig_content = copy.deepcopy(content)
-        return parse_content_spec(content)
+
+        # FIXME: why are we stripping the input in multiple places, should do it
+        #        before passing it in
+        return parse_content_spec(content.strip())
 
     log.debug('content="%s" is not a string (it is a %s) so we are assuming it is a dict',
               content, type(content))
@@ -77,10 +87,12 @@ def yaml_parse(content):
     #        type of dict we expect, should be a different method
     # FIXME: what is expected to happen if passed an empty dict?
     if 'role' in content:
+        # "role" style object
         log.debug('content="%s" appears to be a role', content)
 
         name = content['role']
         if ',' in name:
+            # "old role" style object
             # Old style: {role: "galaxy.role,version,name", other_vars: "here" }
             # Maintained for backwards compat
             content = role_spec_parse(content['role'])
@@ -88,7 +100,8 @@ def yaml_parse(content):
             del content['role']
             content['name'] = name
     else:
-        log.debug('content="%s" does not appear to be a role', content)
+        # "content style" object
+        log.debug('content="%s" does not appear to be an old style role', content)
 
         # FIXME: just use a new name already
         # FIXME: this fails for objects with no dict attribute, like a list
