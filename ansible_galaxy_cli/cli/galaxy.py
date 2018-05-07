@@ -33,7 +33,6 @@ import yaml
 from jinja2 import Environment, FileSystemLoader
 
 from ansible_galaxy_cli import cli
-from ansible_galaxy.config import defaults
 from ansible_galaxy.config import runtime
 from ansible_galaxy import exceptions
 from ansible_galaxy_cli import exceptions as cli_exceptions
@@ -380,7 +379,7 @@ class GalaxyCLI(cli.CLI):
         for content in self.args:
             galaxy_content = yaml_parse(content.strip())
             galaxy_content["type"] = self.options.content_type
-            self.log.debug('content install galaxy_content: %s', galaxy_content)
+            self.log.info('content install galaxy_content: %s', galaxy_content)
             content_left.append(GalaxyContent(self.galaxy, **galaxy_content))
 
         for content in content_left:
