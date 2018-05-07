@@ -1,5 +1,6 @@
 import logging
 
+from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 from ansible_galaxy.utils import yaml_parse
 
@@ -229,3 +230,13 @@ def test_parse_content_spec_src_version_name():
 
     assert_just_keys(result)
     assert_keys(result, name='some_name', version='1.0.0', scm=None, src='some_content')
+
+
+def test_parse_content_spec_src_version_name_something_invalid():
+    spec_text = 'some_content,1.0.0,some_name,some_garbage'
+    try:
+        parse_content_spec(spec_text)
+    except exceptions.GalaxyClientError:
+        return
+
+    assert False, 'spec_text="%s" should have caused a GalaxyClientError' % spec_text
