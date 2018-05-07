@@ -54,10 +54,24 @@ def test_yaml_parse_name_and_version_key_value():
 
 
 def test_yaml_parse_name_github_url():
-    buf = 'git+https://github.com/geerlingguy/ansible-role-awx.git,1.0.0'
-    result = parse_spec(buf)
+    spec = 'git+https://github.com/geerlingguy/ansible-role-awx.git,1.0.0'
+    result = parse_spec(spec)
 
     assert_keys(result, name='awx', version='1.0.0', scm='git', src='https://github.com/geerlingguy/ansible-role-awx.git')
+
+
+def test_yaml_parse_name_github_url_keyword_version():
+    spec = 'git+https://github.com/geerlingguy/ansible-role-awx.git,version=1.0.0'
+    result = parse_spec(spec)
+
+    assert_keys(result, name='awx', version='1.0.0', scm='git', src='https://github.com/geerlingguy/ansible-role-awx.git')
+
+
+def test_yaml_parse_name_non_github_url():
+    buf = 'git+https://git.example.com/geerlingguy/ansible-role-awx.git,1.0.0'
+    result = parse_spec(buf)
+
+    assert_keys(result, name='awx', version='1.0.0', scm='git', src='https://git.example.com/geerlingguy/ansible-role-awx.git')
 
 
 # See https://github.com/ansible/galaxy-cli/wiki/Content-Versioning#versions-in-galaxy-cli
