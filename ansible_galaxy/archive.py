@@ -38,7 +38,8 @@ def extract_archive_members(self,
                             extract_to_path=None,
                             content_type=None,
                             display_callback=None,
-                            install_all_content=False):
+                            install_all_content=False,
+                            force_role_overwrite=False):
     """
     Extract and write out files from the archive, this is a common operation
     needed for both old-roles and new-style galaxy content, the main
@@ -146,7 +147,7 @@ def extract_archive_members(self,
                     "-- extracting %s %s from %s into %s" %
                     (content_type, member.name, self.content_meta.name, os.path.join(path, member.name))
                 )
-            if os.path.exists(os.path.join(path, member.name)) and not getattr(self.options, "force", False):
+            if os.path.exists(os.path.join(path, member.name)) and not force_role_overwrite:
                 if content_type in CONTENT_PLUGIN_TYPES:
                     message = (
                         "the specified Galaxy Content %s appears to already exist." % os.path.join(path, member.name),
