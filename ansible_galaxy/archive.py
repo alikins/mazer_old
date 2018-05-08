@@ -17,6 +17,12 @@ log = logging.getLogger(__name__)
 #  (based on content_type and CONTENT_TYPE_DIR_MAP etc)
 
 
+def default_display_callback(*args, **kwargs):
+    log.debug('args=%s, kwargs=%s', args, kwargs)
+
+    print(args, kwargs)
+
+
 # FIXME: persisting of content archives or subsets thereof
 # FIXME: currently does way too much, could be split into generic and special case classes
 # FIXME: some weirdness here is caused by tarfile API being a little strange. To extract a file
@@ -30,7 +36,9 @@ def extract_archive_members(self,
                             file_name=None,
                             files_to_extract=None,
                             extract_to_path=None,
-                            content_type=None):
+                            content_type=None,
+                            display_callback=None,
+                            install_all_content=False):
     """
     Extract and write out files from the archive, this is a common operation
     needed for both old-roles and new-style galaxy content, the main
@@ -43,7 +51,10 @@ def extract_archive_members(self,
     # now we do the actual extraction to the path
     log.debug('tar_file=%s, parent_dir=%s, file_name=%s', tar_file_obj, parent_dir, file_name)
     log.debug('extract_to_path=%s', extract_to_path)
+
+    display_callback = display_callback or default_display_callback
     files_to_extract = files_to_extract or []
+
     plugin_found = None
 
     if file_name:
@@ -131,7 +142,7 @@ def extract_archive_members(self,
             log.debug('member.name: %s', member.name)
 
             if content_type in CONTENT_PLUGIN_TYPES:
-                self.display_callback(
+                display_callback(
                     "-- extracting %s %s from %s into %s" %
                     (content_type, member.name, self.content_meta.name, os.path.join(path, member.name))
                 )
@@ -141,16 +152,16 @@ def extract_archive_members(self,
                         "the specified Galaxy Content %s appears to already exist." % os.path.join(path, member.name),
                         "Use of --force for non-role Galaxy Content Type is not yet supported"
                     )
-                    if self._install_all_content:
+                    if install_all_content:
                         # FIXME - Probably a better way to handle this
-                        self.display_callback(" ".join(message), level='warning')
+                        display_callback(" ".join(message), level='warning')
                     else:
                         raise exceptions.GalaxyClientError(" ".join(message))
                 else:
                     message = "the specified role %s appears to already exist. Use --force to replace it." % self.content_meta.name
-                    if self._install_all_content:
+                    if install_all_content:
                         # FIXME - Probably a better way to handle this
-                        self.display_callback(message, level='warning')
+                        display_callback(message, level='warning')
                     else:
                         raise exceptions.GalaxyClientError(message)
 
