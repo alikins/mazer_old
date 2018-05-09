@@ -638,6 +638,90 @@ class GalaxyContent(object):
 
         return installed
 
+    # FIXME: replace galaxy_metadata_section with a attr on GalaxyContentMeta
+    def _install_galaxy_metadata(self, content_tar_file, archive_parent_dir, content_meta, galaxy_metadata, galaxy_metadata_section):
+        installed = False
+
+        self.log.debug('galaxy_metadata_section=%s', galaxy_metadata_section)
+        if galaxy_metadata_section == 'meta_version':
+            return
+
+        # FIXME: suppose this is basically options for setting up a deserializer
+        # FIXME: def should be elsewhere, likely some serializer class
+        for content_stanza in galaxy_metadata[galaxy_metadata_section]:
+
+            self.log.debug('content_stanza=%s', content_stanza)
+            path_pattern = content_stanza['path']
+            self.log.debug('galaxy md modules content=%s', content_stanza)
+            self.log.debug('galaxy md modules path_pattern=%s', path_pattern)
+
+            # FIXME: os.sep seems wrong here, the yaml format shouldn't care?
+            member_matches = archive.filter_members_by_fnmatch(content_tar_file, '*/%s' % path_pattern)
+
+            import pprint
+            self.log.debug('member_matches=%s', pprint.pformat(member_matches))
+
+            self.log.info('about to extract content_type=%s %s to %s',
+                          content_meta.content_type, content_meta.name, content_meta.path)
+
+            res = archive.extract_by_content_type(content_tar_file,
+                                                  archive_parent_dir,
+                                                  content_meta,
+                                                  files_to_extract=member_matches,
+                                                  # content_type=self.content_meta.content_type,
+                                                  extract_to_path=content_meta.path,
+                                                  content_type_requires_meta=False)
+            self.log.debug('res: %s', res)
+
+            installed = True
+
+            break
+
+
+            # FIXME: on a general level, having content that only sometimes has dep info seems like a problem
+            if 'dependencies' in content_stanza:
+                for dep in content_stanza['dependencies']:
+                    if 'src' not in dep:
+                        raise exceptions.GalaxyClientError("ansible-galaxy.yml dependencies must provide a src")
+
+                    dep_content_info = yaml_parse(dep['src'])
+                    # FIXME - Should we assume this to be true for module deps?
+                    dep_content_info["type"] = "module_util"
+
+                    self.display_callback('- processing dependency: %s' % dep_content_info["src"])
+
+                    # This is an external dep, treat it as such
+                    if dep_content_info["scm"]:
+                        dep_content = GalaxyContent(self.galaxy, **dep_content_info)
+                        try:
+                            installed = dep_content.install()
+                        except exceptions.GalaxyClientError as e:
+                            self.display_callback("- dependency %s was NOT installed successfully: %s " %
+                                                  (dep_content.name, str(e)), level='warning')
+                            continue
+                    else:
+                        # Local dep, just install it
+                        self._set_type("module_util")
+                        self._set_content_paths()
+                        if len(dep["src"].split(os.sep)) > 1:
+                            if dep["src"].split(os.sep)[-1] in ['/', '*']:
+                                # Handle the glob or designation of entire directory install
+                                self._write_archived_files(content_tar_file, os.path.join(archive_parent_dir, dep['src']))
+                                installed = True
+                            else:
+                                self._write_archived_files(
+                                    content_tar_file,
+                                    os.path.join(archive_parent_dir, os.path.dirname(dep['src'])),
+                                    file_name=dep['src'].split(os.sep)[-1]
+                                )
+                                installed = True
+
+        else:
+            # FIXME - add more types other than module here
+            raise exceptions.GalaxyClientError("ansible-galaxy.yml install not yet supported for content_type %s" % self.content_type)
+
+        return installed
+
     def _install_all(self, content_tar_file, archive_parent_dir):
         # FIXME: not sure of best approach/pattern to figuring out how/where to extract the content too
         #        It is almost similar to a url rewrite engine. Or really, persisting of some object that was loaded from a DTO
@@ -810,6 +894,7 @@ class GalaxyContent(object):
                 #         all content types defined in the ansible-galaxy.yml file
 
                 for _content in self._galaxy_metadata:
+
                     _content_dir = CONTENT_TYPE_DIR_MAP.get(_content, None)
                     _content_type = _content
 
@@ -825,87 +910,17 @@ class GalaxyContent(object):
                                                               content_type=_content_type,
                                                               content_dir=_content_dir)
 
-                    #if not _content_dir:
-                    #    # FIXME - add more types other than module here
-                    #    raise exceptions.GalaxyClientError("ansible-galaxy.yml install not yet supported for content_type=%s content_dir=%s" %
-                    #                                       (self.content_type, _content_dir))
-
-                    # FIXME: suppose this is basically options for setting up a deserializer
-                    # FIXME: def should be elsewhere, likely some serializer class
-                    if _content == "meta_version":
-                        continue
-                    elif _content == "modules":
-                        #self._set_type("module")
-                        #self._set_content_paths()
-                        for module in self._galaxy_metadata[_content]:
-                            path_pattern = module['path']
-                            self.log.debug('galaxy md modules module=%s', module)
-                            self.log.debug('galaxy md modules path_pattern=%s', path_pattern)
-
-                            # FIXME: os.sep seems wrong here, the yaml format shouldn't care?
-                            member_matches = archive.filter_members_by_fnmatch(content_tar_file, '*/%s' % path_pattern)
-
-                            # import pprint
-                            self.log.debug('member_matches=%s', pprint.pformat(member_matches))
-
-                            self.log.info('about to extract content_type=%s %s to %s',
-                                          _content_meta.content_type, _content_meta.name, _content_meta.path)
-
-                            res = archive.extract_by_content_type(content_tar_file,
-                                                                  archive_parent_dir,
-                                                                  _content_meta,
-                                                                  files_to_extract=member_matches,
-                                                                  # content_type=self.content_meta.content_type,
-                                                                  extract_to_path=_content_meta.path,
-                                                                  content_type_requires_meta=False)
-                            self.log.debug('res: %s', res)
-
-                            installed = True
-
-                            break
+                    res = self._install_galaxy_metadata(content_tar_file,
+                                                        archive_parent_dir,
+                                                        _content_meta,
+                                                        self._galaxy_metadata,
+                                                        _content)
+                    self.log.debug('res=%s', res)
 
 
-                            # FIXME: on a general level, having content that only sometimes has dep info seems like a problem
-                            if 'dependencies' in module:
-                                for dep in module['dependencies']:
-                                    if 'src' not in dep:
-                                        raise exceptions.GalaxyClientError("ansible-galaxy.yml dependencies must provide a src")
-
-                                    dep_content_info = yaml_parse(dep['src'])
-                                    # FIXME - Should we assume this to be true for module deps?
-                                    dep_content_info["type"] = "module_util"
-
-                                    self.display_callback('- processing dependency: %s' % dep_content_info["src"])
-
-                                    # This is an external dep, treat it as such
-                                    if dep_content_info["scm"]:
-                                        dep_content = GalaxyContent(self.galaxy, **dep_content_info)
-                                        try:
-                                            installed = dep_content.install()
-                                        except exceptions.GalaxyClientError as e:
-                                            self.display_callback("- dependency %s was NOT installed successfully: %s " %
-                                                                  (dep_content.name, str(e)), level='warning')
-                                            continue
-                                    else:
-                                        # Local dep, just install it
-                                        self._set_type("module_util")
-                                        self._set_content_paths()
-                                        if len(dep["src"].split(os.sep)) > 1:
-                                            if dep["src"].split(os.sep)[-1] in ['/', '*']:
-                                                # Handle the glob or designation of entire directory install
-                                                self._write_archived_files(content_tar_file, os.path.join(archive_parent_dir, dep['src']))
-                                                installed = True
-                                            else:
-                                                self._write_archived_files(
-                                                    content_tar_file,
-                                                    os.path.join(archive_parent_dir, os.path.dirname(dep['src'])),
-                                                    file_name=dep['src'].split(os.sep)[-1]
-                                                )
-                                                installed = True
-
-                    else:
-                        # FIXME - add more types other than module here
-                        raise exceptions.GalaxyClientError("ansible-galaxy.yml install not yet supported for content_type %s" % self.content_type)
+                # TODO: accumulate
+                installed = True
+                break
 
             elif self.content_meta.content_type == 'all':
                 self.log.info('Installing %s as a content_type=%s', self.content_meta.name, self.content_meta.content_type)
