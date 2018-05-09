@@ -1,10 +1,10 @@
 #!/bin/bash -evux
 
 # install strategy plugins from a plugin only  repo
-rm -rf ~/.ansible/content
-ansible-galaxy content-install -t strategy_plugin alikins.content-just-strategy-plugins
-tree ~/.ansible/content
-[ -d ~/.ansible/content/strategy_plugins ]
+#rm -rf ~/.ansible/content
+#ansible-galaxy content-install -t strategy_plugin alikins.content-just-strategy-plugins
+#tree ~/.ansible/content
+#[ -d ~/.ansible/content/strategy_plugins ]
 
 # install 'all' from a multi-content repo
 rm -rf ~/.ansible/content
