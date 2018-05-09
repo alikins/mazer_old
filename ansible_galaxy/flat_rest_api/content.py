@@ -40,7 +40,7 @@ from ansible_galaxy.fetch.local_file import LocalFileFetch
 from ansible_galaxy.fetch.remote_url import RemoteUrlFetch
 from ansible_galaxy.fetch.galaxy_url import GalaxyUrlFetch
 from ansible_galaxy.models.content import CONTENT_PLUGIN_TYPES, CONTENT_TYPES
-from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP
+from ansible_galaxy.models.content import CONTENT_TYPE_DIR_MAP, TYPE_DIR_CONTENT_TYPE_MAP
 from ansible_galaxy.models import content
 from ansible_galaxy.utils.yaml_parse import yaml_parse
 
@@ -795,48 +795,75 @@ class GalaxyContent(object):
                            self.content_type, self.content_meta.content_type,
                            self.content_type == self.content_meta.content_type)
 
-            if self.content_meta.content_type == 'all':
-                self.log.info('Installing %s as a content_type=%s', self.content_meta.name, self.content_meta.content_type)
-
-                installed = self._install_all(content_tar_file, archive_parent_dir)
-
-                # write out the install info file for later use
-                # self._write_galaxy_install_info()
-
-                break
-
-            elif galaxy_file:
+            # TODO: truthiness of _galaxy_metadata may be better, since that means it was parsed and non empty
+            if galaxy_file:
                 self.log.info('Installing %s as a content_type=%s', self.content_meta.name, self.content_meta.content_type)
 
                 self.log.debug('galaxy_file=%s', galaxy_file)
-                self.log.debug('galaxy_metadata=%s', self.galaxy_metadata)
+
+                import pprint
+                self.log.debug('galaxy_metadata=%s', pprint.pformat(self._galaxy_metadata))
                 # Parse the ansible-galaxy.yml file and install things
                 # as necessary
 
                 # FIXME - need to handle the scenario where we want
                 #         all content types defined in the ansible-galaxy.yml file
 
-                for _content in self.galaxy_metadata:
+                for _content in self._galaxy_metadata:
+                    _content_dir = CONTENT_TYPE_DIR_MAP.get(_content, None)
+                    _content_type = _content
+
+                    if _content == 'modules':
+                        _content_dir = 'library'
+                        _content_type = 'module'
+
+                    _content_meta = content.GalaxyContentMeta(name=self.content_meta.name,
+                                                              src=self.content_meta.src,
+                                                              version=self.content_meta.version,
+                                                              scm=self.content_meta.scm,
+                                                              path=self.content_meta.path,
+                                                              content_type=_content_type,
+                                                              content_dir=_content_dir)
+
+                    #if not _content_dir:
+                    #    # FIXME - add more types other than module here
+                    #    raise exceptions.GalaxyClientError("ansible-galaxy.yml install not yet supported for content_type=%s content_dir=%s" %
+                    #                                       (self.content_type, _content_dir))
+
                     # FIXME: suppose this is basically options for setting up a deserializer
                     # FIXME: def should be elsewhere, likely some serializer class
                     if _content == "meta_version":
                         continue
                     elif _content == "modules":
-                        self._set_type("module")
-                        self._set_content_paths()
-                        for module in self.galaxy_metadata[_content]:
-                            if len(module["path"].split(os.sep)) > 1:
-                                if module["path"].split(os.sep)[-1] in ['/', '*']:
-                                    # Handle the glob or designation of entire directory install
-                                    self._write_archived_files(content_tar_file, os.path.join(archive_parent_dir, module['path']))
-                                    installed = True
-                                else:
-                                    self._write_archived_files(
-                                        content_tar_file,
-                                        os.path.join(archive_parent_dir, os.path.dirname(module['path'])),
-                                        file_name=module['path'].split(os.sep)[-1]
-                                    )
-                                    installed = True
+                        #self._set_type("module")
+                        #self._set_content_paths()
+                        for module in self._galaxy_metadata[_content]:
+                            path_pattern = module['path']
+                            self.log.debug('galaxy md modules module=%s', module)
+                            self.log.debug('galaxy md modules path_pattern=%s', path_pattern)
+
+                            # FIXME: os.sep seems wrong here, the yaml format shouldn't care?
+                            member_matches = archive.filter_members_by_fnmatch(content_tar_file, '*/%s' % path_pattern)
+
+                            # import pprint
+                            self.log.debug('member_matches=%s', pprint.pformat(member_matches))
+
+                            self.log.info('about to extract content_type=%s %s to %s',
+                                          _content_meta.content_type, _content_meta.name, _content_meta.path)
+
+                            res = archive.extract_by_content_type(content_tar_file,
+                                                                  archive_parent_dir,
+                                                                  _content_meta,
+                                                                  files_to_extract=member_matches,
+                                                                  # content_type=self.content_meta.content_type,
+                                                                  extract_to_path=_content_meta.path,
+                                                                  content_type_requires_meta=False)
+                            self.log.debug('res: %s', res)
+
+                            installed = True
+
+                            break
+
 
                             # FIXME: on a general level, having content that only sometimes has dep info seems like a problem
                             if 'dependencies' in module:
@@ -879,6 +906,16 @@ class GalaxyContent(object):
                     else:
                         # FIXME - add more types other than module here
                         raise exceptions.GalaxyClientError("ansible-galaxy.yml install not yet supported for content_type %s" % self.content_type)
+
+            elif self.content_meta.content_type == 'all':
+                self.log.info('Installing %s as a content_type=%s', self.content_meta.name, self.content_meta.content_type)
+
+                installed = self._install_all(content_tar_file, archive_parent_dir)
+
+                # write out the install info file for later use
+                # self._write_galaxy_install_info()
+
+                break
 
             elif not meta_file and not galaxy_file:
                 self.log.info('Installing %s as a content_type=%s', self.content_meta.name, self.content_meta.content_type)
