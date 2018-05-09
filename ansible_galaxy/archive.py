@@ -35,8 +35,8 @@ def default_display_callback(*args, **kwargs):
 # TODO:
 
 def tar_info_content_name_match(tar_info, content_name, content_path=None, match_pattern=None):
-    log.debug('tar_info=%s, content_name=%s, content_path=%s, match_pattern=%s',
-              tar_info, content_name, content_path, match_pattern)
+    #log.debug('tar_info=%s, content_name=%s, content_path=%s, match_pattern=%s',
+    #          tar_info, content_name, content_path, match_pattern)
     # only reg files or symlinks can match
     if not tar_info.isreg() and not tar_info.islnk():
         return False
@@ -50,7 +50,7 @@ def tar_info_content_name_match(tar_info, content_name, content_path=None, match
         if content_path:
             match_pattern = '*/%s/%s*' % (content_path, content_name)
 
-    log.debug('match_pattern=%s', match_pattern)
+    # log.debug('match_pattern=%s', match_pattern)
     # FIXME: would be better as two predicates both apply by comprehension
     if fnmatch.fnmatch(tar_info.name, match_pattern):
         return True
@@ -72,7 +72,7 @@ def filter_members_by_content_type(tar_file_obj,
                       if tar_info_content_name_match(tar_file_member,
                                                      "",
                                                      # self.content_meta.name,
-                                                     content_path=CONTENT_TYPE_DIR_MAP[content_type])]
+                                                     content_path=CONTENT_TYPE_DIR_MAP.get(content_type))]
 
     # everything for roles
     if content_type == 'role':
@@ -161,8 +161,8 @@ def extract_by_content_type(tar_file_obj,
                     plugin_found = parent_dir.lstrip(content_meta.name)
 
             # secondary dir (roles/, callback_plugins/) is a match for the content_type
-            elif len(parts_list) > 1 and parts_list[1] == CONTENT_TYPE_DIR_MAP[content_meta.content_type]:
-                plugin_found = CONTENT_TYPE_DIR_MAP[content_meta.content_type]
+            elif len(parts_list) > 1 and parts_list[1] == CONTENT_TYPE_DIR_MAP.get(content_meta.content_type):
+                plugin_found = CONTENT_TYPE_DIR_MAP.get(content_meta.content_type)
 
 
 
