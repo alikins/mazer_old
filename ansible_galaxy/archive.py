@@ -82,7 +82,7 @@ def filter_members_by_content_type(tar_file_obj,
     if content_type == 'role':
         member_matches = tar_file_members
 
-    log.debug('member_matches=%s', pprint.pformat([x.name for x in member_matches]))
+    # log.debug('member_matches=%s', pprint.pformat([x.name for x in member_matches]))
 
     return member_matches
 
