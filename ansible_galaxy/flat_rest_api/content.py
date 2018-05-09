@@ -767,6 +767,11 @@ class GalaxyContent(object):
 
             # FIXME: a few pages of code in a try block, extract to own method/class
             try:
+                self.log.info('Installing content of type: %s', self.content_type)
+                self.log.debug('self.content_type=%s, self.content_meta.content_type=%s, are_equal? %s',
+                               self.content_type, self.content_meta.content_type,
+                               self.content_type == self.content_meta.content_type)
+
                 # FIXME: figure out what the 'case' is first, then branch to implementations and mv the impls
                 if self.content_type == "role" and meta_file and not galaxy_file:
                     # This is an old-style role
@@ -797,6 +802,7 @@ class GalaxyContent(object):
                     #                  if tar_info_content_name_match(tar_member, self.content_meta.name)]
                     # self.log.debug('member_matches: %s' % member_matches)
                     self.log.debug('content_meta: %s', self.content_meta)
+                    self.log.info('about to extract %s to %s', self.content_meta.name, self.content_meta.path)
 
                     archive.extract_by_content_type(content_tar_file,
                                                     archive_parent_dir,
@@ -912,6 +918,8 @@ class GalaxyContent(object):
                         #                                                 # self.content_meta.name,
                         #                                                 content_path=CONTENT_TYPE_DIR_MAP[self.content_meta.content_type])]
 
+                        self.log.info('about to extract content_type=%s %s to %s',
+                                      self.content_meta.content_type, self.content_meta.name, self.content_meta.path)
                         res = archive.extract_by_content_type(content_tar_file,
                                                               archive_parent_dir,
                                                               self.content_meta,
