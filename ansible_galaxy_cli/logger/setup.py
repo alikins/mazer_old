@@ -6,7 +6,8 @@ import os
 
 LOG_FILE = os.path.expandvars(os.path.expanduser('~/.ansible/ansible-galaxy-cli.log')),
 
-DEFAULT_LEVEL = 'DEBUG'
+DEFAULT_LEVEL = os.getenv('GALAXY_CLI_LOG_LEVEL', 'DEBUG').upper()
+
 DEFAULT_DEBUG_FORMAT = '[%(asctime)s,%(msecs)03d %(process)05d %(levelname)-0.1s] %(name)s %(funcName)s:%(lineno)d - %(message)s'
 DEFAULT_HANDLERS = ['console', 'file']
 
@@ -46,6 +47,12 @@ DEFAULT_LOGGING_CONFIG = {
     'loggers': {
         'ansible_galaxy': {
             'handlers': DEFAULT_HANDLERS,
+            'level': DEFAULT_LEVEL,
+        },
+        'ansible_galaxy.flat_rest_api': {
+            'level': 'INFO',
+        },
+        'ansible_galaxy.flat_rest_api.content': {
             'level': DEFAULT_LEVEL,
         },
         'ansible_galaxy_cli': {
