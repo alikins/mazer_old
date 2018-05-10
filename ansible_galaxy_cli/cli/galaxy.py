@@ -465,7 +465,6 @@ class GalaxyCLI(cli.CLI):
                                 else:
                                     self.display('- dependency %s is already installed, skipping.' % dep_role.name)
 
-
         return 0
 
     def execute_install(self):
