@@ -201,12 +201,15 @@ class GalaxyContent(object):
         """
         Conditionally set content path based on content type
         """
-        self.log.debug('content_meta before: %s', self.content_meta)
+        # self.log.debug('content_meta before: %s', self.content_meta)
+
         new_path_info = self._get_content_paths(path, content_type=self.content_type,
                                                 content_name=self.content_meta.name,
                                                 galaxy_content_paths=self.galaxy.content_paths[:],
                                                 install_all_content=self._install_all_content)
-        self.log.debug('XXXXXXXXXXXXXXX new_path_info=%s', new_path_info)
+
+        # self.log.debug('XXXXXXXXXXXXXXX new_path_info=%s', new_path_info)
+
         # FIXME: remove all the internal state tweaking
         # self.path is a property that returns self.content_meta.path
         self.content_meta.path = new_path_info['content_path']
@@ -216,6 +219,7 @@ class GalaxyContent(object):
         self.galaxy.content_paths = new_path_info['galaxy_content_paths']
         self.content_type = new_path_info['content_type']
         self._install_all_content = new_path_info['install_all_content']
+
         self.log.debug('content_meta after: %s', self.content_meta)
 
     def _get_content_paths(self, path=None, content_name=None, content_type=None,
@@ -244,12 +248,12 @@ class GalaxyContent(object):
             # caveot of needing to inspect to find out if there's a meta/main.yml
             # and handling a legacy role type accordingly
 
-            self.log.debug('old path=%s', path)
+            # self.log.debug('old path=%s', path)
 
             if content_name not in path and new_content_type in ["role", "all"]:
                 path = os.path.join(path, content_name)
 
-            self.log.debug('new path=%s', path)
+            # self.log.debug('new path=%s', path)
 
             # self.path = path
             content_path = path
@@ -300,7 +304,7 @@ class GalaxyContent(object):
                   'install_all_content': install_all_content,
                   'content_content_path': content_content_path}
 
-        log.debug('get_content_path results=%s', result)
+        # log.debug('get_content_path results=%s', result)
 
         return result
 
@@ -780,11 +784,8 @@ class GalaxyContent(object):
 
         # FIXME: get rid of the while loop or continue if nothing catches
         # TODO: need an install state machine real bad
-        count = 0
         done = False
         while not done:
-            count += 1
-            self.log.debug('WHILE COUNT: %s', count)
             if self.content_type != "all":
                 self.display_callback("- extracting %s %s to %s" % (self.content_type, self.content_meta.name, self.path))
             else:
@@ -891,11 +892,13 @@ class GalaxyContent(object):
             fetcher.cleanup()
 
             # self.display_callback('Installed content: %s',
-            self.log.info('Installed:\n %s', pprint.pformat(installed))
+            # self.log.info('Installed:\n %s', pprint.pformat(installed))
             # return installed
             done = True
 
-        self.log.info('Installed(nothing?):\n%s', pprint.pformat(installed))
+        for item in installed:
+            self.log.info('Installed content: %s', item[0])
+            self.log.debug('Installed files: %s', pprint.pformat(item[1]))
         return installed
         # return False
 
