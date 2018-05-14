@@ -1,5 +1,7 @@
 import logging
 
+import pytest
+
 from ansible_galaxy import exceptions
 from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 from ansible_galaxy.utils import yaml_parse
@@ -29,6 +31,53 @@ def assert_keys(content_spec, name=None, version=None, scm=None, src=None):
     assert content_spec['scm'] == scm
     assert content_spec['src'] == src, \
         'content_spec src=%s does not match expected src=%s' % (content_spec['src'], src)
+
+
+just_src = {'src': 'something'}
+src_ver = {'src': 'something',
+           'version': '1.2.3'}
+src_name = {'src': 'something',
+            'name': 'somename'}
+full_info = {'src': 'something',
+             'version': '1.2.3',
+             'name': 'somename'}
+kwarg_test_cases = \
+    [('something', just_src),
+     ('something,1.2.3', src_ver),
+     ('something,version=1.2.3', src_ver),
+     ('something,1.2.3,somename', full_info),
+     ('something,1.2.3,name=somename', full_info),
+     ('something,name=somename,version=1.2.3', full_info),
+     ('something,1.2.3,somename', full_info),
+     # dont want to expect this to work
+     ('something,name=somename,1.2.3', full_info)]
+
+
+@pytest.fixture(scope='module',
+                params=kwarg_test_cases,
+                ids=[x[0] for x in kwarg_test_cases])
+def split_kwarg(request):
+    yield request.param
+
+
+def test_split_kwarg(split_kwarg):
+    valid_keywords = ('name', 'version')
+    result = yaml_parse.split_kwarg(split_kwarg[0], valid_keywords)
+    log.debug('spec=%s result=%s', split_kwarg[0], [x for x in result])
+
+
+def test_split_comma(split_kwarg):
+    valid_keywords = ('name', 'version')
+    result = yaml_parse.split_comma(split_kwarg[0], valid_keywords)
+    log.debug('spec=%s result=%s', split_kwarg[0], [x for x in result])
+
+
+def test_split_content_spec(split_kwarg):
+    valid_keywords = ('src', 'version', 'name', 'scm')
+    result = yaml_parse.split_content_spec(split_kwarg[0], valid_keywords)
+    log.debug('spec=%s result=%s', split_kwarg[0], result)
+    assert result == split_kwarg[1]
+
 
 
 def test_yaml_parse_empty_string():
@@ -225,11 +274,11 @@ def test_parse_content_spec_src_version():
 
 
 def test_parse_content_spec_src_version_name():
-    spec_text = 'some_content,1.0.0,some_name'
+    spec_text = 'some_content,1.2.3,somename'
     result = parse_content_spec(spec_text)
 
     assert_just_keys(result)
-    assert_keys(result, name='some_name', version='1.0.0', scm=None, src='some_content')
+    assert_keys(result, name='somename', version='1.2.3', scm=None, src='some_content')
 
 
 def test_parse_content_spec_src_version_name_something_invalid():
@@ -259,11 +308,11 @@ def test_parse_content_spec_src_version_key_value():
 
 
 def test_parse_content_spec_src_version_name_key_value():
-    spec_text = 'some_content,1.0.0,name=some_name'
+    spec_text = 'some_content,1.2.3,name=somename'
     result = parse_content_spec(spec_text)
 
     assert_just_keys(result)
-    assert_keys(result, name='some_name', version='1.0.0', scm=None, src='some_content')
+    assert_keys(result, name='somename', version='1.2.3', scm=None, src='some_content')
 
 
 def test_parse_content_spec_src_version_name_something_invalid_key_value():
