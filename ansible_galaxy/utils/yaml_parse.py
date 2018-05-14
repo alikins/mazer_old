@@ -3,7 +3,7 @@ import logging
 import six
 
 from ansible_galaxy import exceptions
-from ansible_galaxy.utils.content_name import repo_url_to_content_name
+from ansible_galaxy.utils.content_name import repo_url_to_repo_name
 from ansible_galaxy.utils.role_spec import role_spec_parse
 from ansible_galaxy.models.content import VALID_ROLE_SPEC_KEYS
 
@@ -80,7 +80,7 @@ def parse_content_spec(content_spec_text, valid_keywords=None):
     print('data: %s' % data)
 
     if data['name'] is None:
-        scm_name = repo_url_to_content_name(data['src'])
+        scm_name = repo_url_to_repo_name(data['src'])
         data['name'] = scm_name
         if '+' in data['src']:
             (scm_url, scm_src) = data['src'].split('+', 1)
