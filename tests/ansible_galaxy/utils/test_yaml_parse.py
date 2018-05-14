@@ -79,7 +79,6 @@ def test_split_content_spec(split_kwarg):
     assert result == split_kwarg[1]
 
 
-
 def test_yaml_parse_empty_string():
     spec = ''
     result = parse_spec(spec)
@@ -160,7 +159,7 @@ def test_yaml_parse_an_empty_dict():
     spec = {}
     result = parse_spec(spec)
 
-    assert_keys(result, name=None, version=None, scm=None, src=None)
+    assert_keys(result, name=None, version='', scm=None, src=None)
 
 
 def test_yaml_parse_a_dict():
@@ -282,13 +281,10 @@ def test_parse_content_spec_src_version_name():
 
 
 def test_parse_content_spec_src_version_name_something_invalid():
-    spec_text = 'some_content,1.0.0,some_name,some_garbage'
-    try:
-        parse_content_spec(spec_text)
-    except exceptions.GalaxyClientError:
-        return
+    spec_text = 'some_content,1.2.3,somename,some_scm,some_garbage'
+    result = parse_content_spec(spec_text)
 
-    assert False, 'spec_text="%s" should have caused a GalaxyClientError' % spec_text
+    assert_keys(result, name='somename', version='1.2.3', scm='some_scm', src='some_content')
 
 
 def test_parse_content_spec_src_key_value():

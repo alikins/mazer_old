@@ -18,7 +18,8 @@ def split_kwarg(spec_string, valid_keywords):
 
     if parts[0] in valid_keywords:
         return (parts[0], parts[1])
-    return (None, spec_string)
+
+    raise exceptions.GalaxyClientError('The content spec uses an unsuppoted keyword: %s' % spec_string)
 
 
 def split_comma(spec_string, valid_keywords):
