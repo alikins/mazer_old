@@ -147,18 +147,22 @@ def yaml_parse(content):
 
         # FIXME: just use a new name already
         # FIXME: this fails for objects with no dict attribute, like a list
-        content = content.copy()
+        content_copy = content.copy()
 
-        if content.get('src', None):
+        data = {'src': None, 'version': None, 'name': None, 'scm': None}
+        data.update(content_copy)
+        content = data
+
+        if data.get('src', None):
             # valid_kw = ('src', 'version', 'name', 'scm')
-            new_data = parse_content_spec(content['src'], VALID_ROLE_SPEC_KEYS)
+            new_data = parse_content_spec(data['src'], VALID_ROLE_SPEC_KEYS)
             log.debug('new_data: %s', new_data)
 
             # del new_data['src']
             # content.update(new_data)
             for key in new_data:
-                if key not in content:
-                    content[key] = new_data[key]
+                if not data.get(key, None):
+                    data[key] = new_data[key]
             #content['scm'] = new_data.get('scm')
             #content['role'] = new_data.get('role')
 

@@ -20,8 +20,8 @@ def parse_spec(content_spec):
 
 
 def assert_keys(content_spec, name=None, version=None, scm=None, src=None):
-    name = name or ''
-    src = src or ''
+    # name = name or ''
+    # src = src or ''
     assert isinstance(content_spec, dict)
 
     # TODO: should it default to empty string?
@@ -159,7 +159,7 @@ def test_yaml_parse_an_empty_dict():
     spec = {}
     result = parse_spec(spec)
 
-    assert_keys(result, name=None, version='', scm=None, src=None)
+    assert_keys(result, name=None, version=None, scm=None, src=None)
 
 
 def test_yaml_parse_a_dict():
@@ -198,7 +198,7 @@ def test_yaml_parse_a_dict_with_conflicts():
             'src': 'galaxy.role,1.0.0,some_name2'}
     result = parse_spec(spec)
 
-    assert_keys(result, name='some_name2', version='1.0.0', scm=None, src=None)
+    assert_keys(result, name='some_name1', version='1.0.0', scm=None, src=None)
 
 
 def test_yaml_parse_a_old_style_role_dict():
@@ -227,7 +227,7 @@ def test_yaml_parse_a_comma_sep_style_role_dict_with_version():
     result = parse_spec(spec)
 
     # FIXME: wtf is 'src' expected to look like here?
-    assert_keys(result, name='galaxy.role', version='1.2.4', scm=None, src=src)
+    assert_keys(result, name=None, version='1.2.4', scm=None, src='galaxy.role')
 
 
 # FIXME: I'm not real sure what the result of this is supposed to be
