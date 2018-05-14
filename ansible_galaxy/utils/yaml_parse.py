@@ -51,15 +51,11 @@ def split_content_spec(spec_string, valid_keywords):
     return info
 
 
-def parse_content_spec(content_spec_text):
+def parse_content_spec(content_spec_text, valid_keywords=None):
     '''Given a text/str object describing a galaxy content, parse it.
 
     And return a dict with keys: 'name', 'src', 'scm', 'version'
     '''
-    name = None
-    scm = None
-    src = None
-    version = None
 
     # TODO: tokenizer?
     #if ',' in content_spec_text:
@@ -72,7 +68,7 @@ def parse_content_spec(content_spec_text):
     # else:
     #    src = content_spec_text
 
-    valid_keywords = ('src', 'version', 'name', 'scm')
+    valid_keywords = valid_keywords or ('src', 'version', 'name', 'scm')
     data = {'src': None,
             'name': None,
             'version': None,
@@ -153,18 +149,30 @@ def yaml_parse(content):
         # FIXME: this fails for objects with no dict attribute, like a list
         content = content.copy()
 
-        if 'src' in content:
+        if content.get('src', None):
+            # valid_kw = ('src', 'version', 'name', 'scm')
+            new_data = parse_content_spec(content['src'], VALID_ROLE_SPEC_KEYS)
+            log.debug('new_data: %s', new_data)
+
+            # del new_data['src']
+            # content.update(new_data)
+            for key in new_data:
+                if key not in content:
+                    content[key] = new_data[key]
+            #content['scm'] = new_data.get('scm')
+            #content['role'] = new_data.get('role')
+
             # New style: { src: 'galaxy.role,version,name', other_vars: "here" }
             if 'github.com' in content["src"] and 'http' in content["src"] and '+' not in content["src"] and not content["src"].endswith('.tar.gz'):
                 content["src"] = "git+" + content["src"]
 
-            if '+' in content["src"]:
-                (scm, src) = content["src"].split('+')
-                content["scm"] = scm
-                content["src"] = src
+            #if '+' in content["src"]:
+            #    (scm, src) = content["src"].split('+')
+            #    content["scm"] = scm
+            #    content["src"] = src
 
-            if 'name' not in content:
-                content["name"] = repo_url_to_content_name(content["src"])
+            #if 'name' not in content:
+            #    content["name"] = repo_url_to_content_name(content["src"])
 
         if 'version' not in content:
             content['version'] = ''
