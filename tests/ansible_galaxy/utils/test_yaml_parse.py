@@ -33,6 +33,72 @@ def assert_keys(content_spec, name=None, version=None, scm=None, src=None):
         'content_spec src=%s does not match expected src=%s' % (content_spec['src'], src)
 
 
+split_kwarg_valid_test_cases = \
+    ['something',
+     '1.2.3',
+     'version=1.2.3',
+     'name=somename',
+     ]
+
+
+@pytest.fixture(scope='module',
+                params=split_kwarg_valid_test_cases)
+def split_kwarg_valid(request):
+    yield request.param
+
+
+def test_split_kwarg_valid(split_kwarg_valid):
+    valid_keywords = ('name', 'version')
+    result = yaml_parse.split_kwarg(split_kwarg_valid, valid_keywords)
+    log.debug('spec=%s result=%s', split_kwarg_valid, [x for x in result])
+
+
+split_kwarg_invalid_test_cases = \
+    ['name==',
+     'some_invalid_keyword=foo',
+     'blip=']
+
+
+@pytest.fixture(scope='module',
+                params=split_kwarg_invalid_test_cases)
+def split_kwarg_invalid(request):
+    yield request.param
+
+
+def test_split_kwarg_invalid(split_kwarg_invalid):
+    valid_keywords = ('name', 'version')
+    try:
+        yaml_parse.split_kwarg(split_kwarg_invalid, valid_keywords)
+    except exceptions.GalaxyClientError as e:
+        log.exception(e)
+        return
+
+    assert False, 'Expected to get a GalaxyClientError for invalid kwargs for %s' % split_kwarg_invalid
+
+
+split_comma_test_cases = \
+    ['foo',
+     'foo,1.2.3',
+     'foo,version=1.2.3',
+     'foo,1.2.3,somename',
+     'foo,1.2.3,name=somename',
+     'foo,1.2.3,somename,somescm',
+     'foo,1.2.3,somename,somescm,someextra'
+     ]
+
+
+@pytest.fixture(scope='module',
+                params=split_comma_test_cases)
+def split_comma(request):
+    yield request.param
+
+
+def test_split_comma(split_comma):
+    valid_keywords = ('name', 'version')
+    result = yaml_parse.split_comma(split_comma, valid_keywords)
+    log.debug('spec=%s result=%s', split_comma, [x for x in result])
+
+
 just_src = {'src': 'something'}
 src_ver = {'src': 'something',
            'version': '1.2.3'}
@@ -41,7 +107,7 @@ src_name = {'src': 'something',
 full_info = {'src': 'something',
              'version': '1.2.3',
              'name': 'somename'}
-kwarg_test_cases = \
+split_content_spec_test_cases = \
     [('something', just_src),
      ('something,1.2.3', src_ver),
      ('something,version=1.2.3', src_ver),
@@ -50,33 +116,22 @@ kwarg_test_cases = \
      ('something,name=somename,version=1.2.3', full_info),
      ('something,1.2.3,somename', full_info),
      # dont want to expect this to work
-     ('something,name=somename,1.2.3', full_info)]
+     # ('something,name=somename,1.2.3', full_info),
+     ]
 
 
 @pytest.fixture(scope='module',
-                params=kwarg_test_cases,
-                ids=[x[0] for x in kwarg_test_cases])
-def split_kwarg(request):
+                params=split_content_spec_test_cases,
+                ids=[x[0] for x in split_content_spec_test_cases])
+def split_content_spec(request):
     yield request.param
 
 
-def test_split_kwarg(split_kwarg):
-    valid_keywords = ('name', 'version')
-    result = yaml_parse.split_kwarg(split_kwarg[0], valid_keywords)
-    log.debug('spec=%s result=%s', split_kwarg[0], [x for x in result])
-
-
-def test_split_comma(split_kwarg):
-    valid_keywords = ('name', 'version')
-    result = yaml_parse.split_comma(split_kwarg[0], valid_keywords)
-    log.debug('spec=%s result=%s', split_kwarg[0], [x for x in result])
-
-
-def test_split_content_spec(split_kwarg):
+def test_split_content_spec(split_content_spec):
     valid_keywords = ('src', 'version', 'name', 'scm')
-    result = yaml_parse.split_content_spec(split_kwarg[0], valid_keywords)
-    log.debug('spec=%s result=%s', split_kwarg[0], result)
-    assert result == split_kwarg[1]
+    result = yaml_parse.split_content_spec(split_content_spec[0], valid_keywords)
+    log.debug('spec=%s result=%s', split_content_spec[0], result)
+    assert result == split_content_spec[1]
 
 
 def test_yaml_parse_empty_string():
@@ -148,9 +203,9 @@ def test_yaml_parse_name_with_name_key_value():
     assert_keys(result, name='other_name', version=None, scm=None, src='some_content')
 
 
-def test_yaml_parse_a_list_of_strings():
-    spec = ['some_content', 'something_else']
-    parse_spec(spec)
+# def test_yaml_parse_a_list_of_strings():
+#    spec = ['some_content', 'something_else']
+#    parse_spec(spec)
 
     # TODO: verify we get the right exception
 
@@ -198,12 +253,12 @@ def test_yaml_parse_a_dict_with_conflicts():
             'src': 'galaxy.role,1.0.0,some_name2'}
     result = parse_spec(spec)
 
-    assert_keys(result, name='some_name1', version='1.0.0', scm=None, src=None)
+    assert_keys(result, name='some_name1', version='1.2.3', scm=None, src='galaxy.role,1.0.0,some_name2')
 
 
 def test_yaml_parse_a_old_style_role_dict():
     spec = {'role': 'some_role',
-            'version': '1.2.4',
+            'version': '1.2.3',
             'src': 'galaxy.role'}
     result = parse_spec(spec)
 
@@ -215,29 +270,29 @@ def test_yaml_parse_a_old_style_role_dict():
     assert isinstance(result, dict)
     assert result['name'] == name, \
         'content_spec name=%s does not match expected name=%s' % (result['name'], name)
-    assert result['version'] == '1.2.4'
+    assert result['version'] == '1.2.3'
     assert result['src'] == src, \
         'content_spec src=%s does not match expected src=%s' % (result['src'], src)
 
 
 # FIXME: I'm not real sure what the result of this is supposed to be
 def test_yaml_parse_a_comma_sep_style_role_dict_with_version():
-    src = 'galaxy.role,1.2.4'
+    src = 'galaxy.role,1.2.3'
     spec = {'src': src}
     result = parse_spec(spec)
 
     # FIXME: wtf is 'src' expected to look like here?
-    assert_keys(result, name=None, version='1.2.4', scm=None, src='galaxy.role')
+    assert_keys(result, name='galaxy.role', version='1.2.3', scm=None, src='galaxy.role,1.2.3')
 
 
 # FIXME: I'm not real sure what the result of this is supposed to be
 def test_yaml_parse_a_comma_sep_style_role_dict_with_name_version():
-    src = 'galaxy.role,1.2.4,some_role'
+    src = 'galaxy.role,1.2.3,some_role'
     spec = {'src': src}
     result = parse_spec(spec)
 
     # FIXME: wtf is 'src' expected to look like here?
-    assert_keys(result, name='galaxy.role', version='1.2.4', scm=None, src=src)
+    assert_keys(result, name='galaxy.role', version='1.2.3', scm=None, src=src)
 
 
 def parse_content_spec(content_spec):
