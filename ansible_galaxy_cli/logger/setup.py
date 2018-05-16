@@ -3,8 +3,9 @@
 import logging
 import logging.config
 import os
+import yaml
 
-LOG_FILE = os.path.expandvars(os.path.expanduser('~/.ansible/ansible-galaxy-cli.log')),
+LOG_FILE = os.path.expandvars(os.path.expanduser('~/.ansible/galaxy-cli.log'))
 
 DEFAULT_CONSOLE_LEVEL = os.getenv('GALAXY_CLI_LOG_LEVEL', 'WARNING').upper()
 DEFAULT_LEVEL = 'DEBUG'
@@ -12,6 +13,8 @@ DEFAULT_LEVEL = 'DEBUG'
 DEFAULT_DEBUG_FORMAT = '[%(asctime)s,%(msecs)03d %(process)05d %(levelname)-0.1s] %(name)s %(funcName)s:%(lineno)d - %(message)s'
 # DEFAULT_HANDLERS = ['console', 'file']
 DEFAULT_HANDLERS = ['file']
+
+DEFAULT_LOGGING_CONFIG_YAML = os.path.expandvars(os.path.expanduser('~/.ansible/galaxy-logging.yml'))
 
 DEFAULT_LOGGING_CONFIG = {
     'version': 1,
@@ -82,6 +85,13 @@ DEFAULT_LOGGING_CONFIG = {
 }
 
 
+class ExpandTildeWatchedFileHandler(logging.handlers.WatchedFileHandler):
+    def __init__(self, *args, **kwargs):
+        orig_filename = kwargs.pop('filename', '~/.ansible/ansible-galaxy-cli.log')
+        kwargs['filename'] = os.path.expandvars(os.path.expanduser(orig_filename))
+        super(ExpandTildeWatchedFileHandler, self).__init__(*args, **kwargs)
+
+
 def setup(logging_config=None):
     logging_config = logging_config or {}
 
@@ -94,4 +104,13 @@ def setup(logging_config=None):
 
 
 def setup_default():
-    return setup(logging_config=DEFAULT_LOGGING_CONFIG)
+    logging_config = DEFAULT_LOGGING_CONFIG
+
+    try:
+        with open(DEFAULT_LOGGING_CONFIG_YAML, 'r') as logging_config_file:
+            logging_config = yaml.safe_load(logging_config_file)
+    except Exception as e:
+        print(e)
+        raise
+
+    return setup(logging_config)
