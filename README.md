@@ -5,16 +5,48 @@ ansible-galaxy is a tool to manage ansible related content from https://galaxy.a
 ## Features
 
 - More than just roles!
-- multi content repos
-  - repos that can contain multiple roles as well
-    as multiple content types (modules, plugins, etc)
+- Content types include modules, module utils, all plugin types.
+- Content repos can contain multipe types of ansible content
+  - repos can contain multiple roles
+  - repos can also contain modules and plugins
+- Supports installing modules and plugins from galaxy or directly from repos
+
+## Examples
+
+### Installing roles
+
+To install https://galaxy.ansible.com/geerlingguy/nginx/ https://github.com/geerlingguy/ansible-role-nginx via galaxy:
+
+```
+$ ansible-galaxy install geerlingguy.nginx
+```
+
+To install a specific version via galaxy:
+
+```
+$ ansible-galaxy install geerlingguy.nginx,2.6.0
+```
+
+To install via github:
+
+```
+$ ansible-galaxy install git+https://github.com/geerlingguy/ansible-role-nginx
+```
+
+### Installing repos with multiple types of content
+
+To install https://github.com/alikins/ansible-testing-content (alikins.testing-content):
 
 ```
 $ ansible-galaxy install alikins.testing-content
-- extracting all content in alikins.testing-content to content directories
-- alikins.testing-content all was installed successfully to /home/adrian/.ansible/content
+```
+
+This will install all of the content in the https://github.com/alikins/ansible-testing-content
+repo, including various plugins, modules, module_utils, and roles to ~/.ansible/content
+
+```
 $ tree ~/.ansible/content
-/home/adrian/.ansible/content/
+/home/ansible_user/.ansible/content/
 ├── action_plugins
 │   └── add_host.py
 ├── filter_plugins
@@ -62,16 +94,22 @@ $ tree ~/.ansible/content
     ├── debug.py
     └── linear.py
 ```
-- support for repos of modules, plugins, etc
 
-        demo:
+### Installing just one type of content from a multi content repo
 
-    (demo installing regular role  (geerlinguy guy stuff))
+To install just the modules from https://github.com/alikins/ansible-testing-content:
 
-- support for installing content type specific subsets of repos
+```
+$ ansible-galaxy install -t modules alikins.testing-content
+```
 
-ie, install all of the modules and just the modules from a repo that also
-has roles, plugins, etc
+This will install only the modules from modules/ into ~/.ansible/content/library
+
+```
+example output here
+```
+
+### Install just the strategy plugins
 
 ``` shell
 # install just the strategy plugins from alikins.testing-content
@@ -83,9 +121,8 @@ tree ~/.ansible/content
 
 rm -rf ~/.ansible/content && ansible-galaxy install -t module alikins.testing-content
 ```
-  - support installing content type specific subsets of roles
 
-## Install
+## Installation of the ansible-galaxy tool
 
 ### From source
 
