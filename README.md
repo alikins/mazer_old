@@ -133,6 +133,14 @@ tree ~/.ansible/content
 rm -rf ~/.ansible/content && ansible-galaxy install -t module alikins.testing-content
 ```
 
+### Install a role to a different content path
+
+```
+$ ansible-galaxy install --content-path ~/my-ansible-content geerlingguy.nginx
+```
+
+This will install the geerlingguy.nginx role to ~/my-ansible-content/roles/geerlingguy.nginx
+
 ## Installation of the ansible-galaxy tool
 
 ### From source
