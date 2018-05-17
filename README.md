@@ -106,7 +106,18 @@ $ ansible-galaxy install -t modules alikins.testing-content
 This will install only the modules from modules/ into ~/.ansible/content/library
 
 ```
-example output here
+$ tree ~/.ansible/content
+/home/adrian/.ansible/content/
+└── library
+    ├── elasticsearch_plugin.py
+    ├── kibana_plugin.py
+    ├── mysql_db.py
+    ├── mysql_replication.py
+    ├── mysql_user.py
+    ├── mysql_variables.py
+    ├── redis.py
+    └── riak.py
+
 ```
 
 ### Install just the strategy plugins
