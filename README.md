@@ -1,7 +1,6 @@
 # galaxy-cli
-Ansible content manager
 
-ansible-galaxy
+ansible-galaxy is a tool to manage ansible related content from https://galaxy.ansible.com
 
 ## Features
 
@@ -10,7 +9,7 @@ ansible-galaxy
   - repos that can contain multiple roles as well
     as multiple content types (modules, plugins, etc)
 
-    ```
+```
 $ ansible-galaxy install alikins.testing-content
 - extracting all content in alikins.testing-content to content directories
 - alikins.testing-content all was installed successfully to /home/adrian/.ansible/content
@@ -71,34 +70,30 @@ $ tree ~/.ansible/content
 
 - support for installing content type specific subsets of repos
 
-  ie, install all of the modules and just the modules from a repo that also
-  has roles, plugins, etc
+ie, install all of the modules and just the modules from a repo that also
+has roles, plugins, etc
 
-        demo:
+``` shell
+# install just the strategy plugins from alikins.testing-content
 
-            # install just the strategy plugins from alikins.testing-content
+rm -rf ~/.ansible/content && ansible-galaxy install -t strategy_plugin alikins.testing-content
+tree ~/.ansible/content
 
-            rm -rf ~/.ansible/content && ansible-galaxy install -t strategy_plugin alikins.testing-content
-            tree ~/.ansible/content
+# install just the modules
 
-            # install just the modules
-
-            rm -rf ~/.ansible/content && ansible-galaxy install -t module alikins.testing-content
-
-    - support installing content type specific subsets of roles
-
-        demo:
-
+rm -rf ~/.ansible/content && ansible-galaxy install -t module alikins.testing-content
+```
+  - support installing content type specific subsets of roles
 
 ## Install
 
 ### From source
 
-  ```
-  $ git clone https://github.com/ansible/galaxy-cli.git
-  $ cd galaxy-cli
-  $ python setup.py install
-  ```
+```
+$ git clone https://github.com/ansible/galaxy-cli.git
+$ cd galaxy-cli
+$ python setup.py install
+```
 
 Or install the requirements via pip:
 
@@ -107,9 +102,9 @@ $ pip install -r requirements.txt
 ```
 
 ### Via pip (from git)
-   ```
-   pip install -v git+ssh://git@github.com/ansible/galaxy-cli.git
-   ```
+```
+pip install -v git+ssh://git@github.com/ansible/galaxy-cli.git
+```
 
 ## Testing
 
@@ -132,6 +127,7 @@ $ tox
 ```
 
 via 'pytest' directly
+
 ```
 $ pytest tests/
 ```
