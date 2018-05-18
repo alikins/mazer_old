@@ -14,78 +14,36 @@ DEFAULT_DEBUG_FORMAT = '[%(asctime)s,%(msecs)03d %(process)05d %(levelname)-0.1s
 # DEFAULT_HANDLERS = ['console', 'file']
 DEFAULT_HANDLERS = ['file']
 
-DEFAULT_LOGGING_CONFIG_YAML = os.path.expandvars(os.path.expanduser('~/.ansible/galaxy-logging.yml'))
+DEFAULT_LOGGING_CONFIG_YAML = os.path.join(os.path.dirname(__file__), 'default-galaxy-logging.yml')
+LOGGING_CONFIG_YAML = os.path.expandvars(os.path.expanduser('~/.ansible/galaxy-logging.yml'))
 
-DEFAULT_LOGGING_CONFIG = {
+FALLBACK_LOGGING_CONFIG = {
     'version': 1,
 
     'disable_existing_loggers': False,
 
-    'formatters': {
-        # skip the date for console log handler, but include it for the file log handler
-        'console_verbose': {
-            'format': DEFAULT_DEBUG_FORMAT,
-            'datefmt': '%H:%M:%S',
-        },
-        'file_verbose': {
-            'format': '[%(asctime)s %(process)05d %(levelname)-0.1s] %(name)s %(funcName)s:%(lineno)d - %(message)s',
-        },
-    },
-
-    'filters': {},
-
     'handlers': {
-        'console': {
-            'level': DEFAULT_CONSOLE_LEVEL,
-            'class': 'logging.StreamHandler',
-            'formatter': 'console_verbose',
-            'stream': 'ext://sys.stderr',
+        'null_handler': {
+            'class': 'logging.NullHandler',
+            'level': 'ERROR',
         },
-        'file': {
-            'level': DEFAULT_LEVEL,
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': os.path.expandvars(os.path.expanduser('~/.ansible/ansible-galaxy-cli.log')),
-            'formatter': 'file_verbose',
-        },
-        'http_file': {
-            'level': DEFAULT_LEVEL,
-            'class': 'logging.handlers.WatchedFileHandler',
-            'filename': os.path.expandvars(os.path.expanduser('~/.ansible/ansible-galaxy-cli-http.log')),
-            'formatter': 'file_verbose',
-
-        }
     },
 
     'loggers': {
         'ansible_galaxy': {
-            'handlers': DEFAULT_HANDLERS,
-            'level': 'DEBUG',
-        },
-        'ansible_galaxy.flat_rest_api': {
-            'level': 'DEBUG',
-        },
-        'ansible_galaxy.flat_rest_api.content': {
-            'level': 'DEBUG'
-        },
-        'ansible_galaxy.flat_rest_api.api.(http)': {
-            'level': 'INFO',
-            'handlers': DEFAULT_HANDLERS,
-            # to log verbose debug level logging to http_file handler:
-            # 'level': 'DEBUG',
-            # 'handlers': ['http_file'],
-        },
-        'ansible_galaxy.archive.(extract)': {
+            'handlers': ['null_handler'],
             'level': 'INFO',
         },
         'ansible_galaxy_cli': {
-            'handlers': DEFAULT_HANDLERS,
-            'level': 'DEBUG'
+            'handlers': ['null_handler'],
+            'level': 'INFO',
         },
     }
 }
 
 
 class ExpandTildeWatchedFileHandler(logging.handlers.WatchedFileHandler):
+    '''A variant of WatchedFileHandler that will expand ~/ in it's filename param'''
     def __init__(self, *args, **kwargs):
         orig_filename = kwargs.pop('filename', '~/.ansible/ansible-galaxy-cli.log')
         kwargs['filename'] = os.path.expandvars(os.path.expanduser(orig_filename))
@@ -103,14 +61,32 @@ def setup(logging_config=None):
     return conf
 
 
-def setup_default():
-    logging_config = DEFAULT_LOGGING_CONFIG
+def load_config_yaml(config_file_path):
+    logging_config = None
 
     try:
-        with open(DEFAULT_LOGGING_CONFIG_YAML, 'r') as logging_config_file:
+        with open(config_file_path, 'r') as logging_config_file:
             logging_config = yaml.safe_load(logging_config_file)
-    except Exception as e:
+    except OSError as e:
+        pass
+    except yaml.YamlError as e:
         print(e)
-        raise
+
+    return logging_config
+
+
+def setup_default():
+    logging_config = None
+
+    # load custom logging config
+    logging_config = load_config_yaml(LOGGING_CONFIG_YAML)
+
+    # if there is no custom config, load the default
+    if not logging_config:
+        logging_config = load_config_yaml(DEFAULT_LOGGING_CONFIG_YAML)
+
+    # fallback is basically no setup, null handler, etc
+    if not logging_config:
+        logging_config = FALLBACK_LOGGING_CONFIG
 
     return setup(logging_config)
