@@ -96,8 +96,7 @@ def test_context_with_options_content_path():
 
     assert len(galaxy_context.content_roots) == 1
 
-    assert galaxy_context.content_roots[0]['content_path'] == content_path
-    assert galaxy_context.content_roots[0]['name'] == 'cli_option'
+    assert galaxy_context.content_roots[0] == content_path
 
 
 def test_context_with_options_content_path_and_server_url_and_servers():
@@ -116,12 +115,9 @@ def test_context_with_options_content_path_and_server_url_and_servers():
          'ignore_certs': True},
     ]
 
-    test_content_roots = [
-        {'content_path': '/dev/null/some_test_content_path_1',
-         'name': 'default'},
-        {'content_path': '/dev/null/some_test_content_path_2',
-         'name': 'system'},
-    ]
+    test_content_roots = ['/dev/null/some_test_content_path_1',
+                          '/dev/null/some_test_content_path_2',
+                          ]
 
     config = {'servers': test_servers,
               'content_roots': test_content_roots}
@@ -141,12 +137,10 @@ def test_context_with_options_content_path_and_server_url_and_servers():
     assert len(galaxy_context.content_roots) == 3
     assert len(galaxy_context.servers) == 3
 
-    assert galaxy_context.content_roots[0]['content_path'] == content_path
-    assert galaxy_context.content_roots[0]['name'] == 'cli_option'
+    assert galaxy_context.content_roots[0] == content_path
 
-    assert galaxy_context.content_roots[1]['content_path'] == \
-        test_content_roots[0]['content_path']
-    assert galaxy_context.content_roots[1]['name'] == 'default'
+    assert galaxy_context.content_roots[1] == \
+        test_content_roots[0]
 
     assert galaxy_context.servers[0]['url'] == server_url
     assert galaxy_context.servers[0]['ignore_certs'] == ignore_certs
@@ -194,10 +188,8 @@ def test_context_from_config_and_options():
     ]
 
     test_content_roots = [
-        {'content_path': '/dev/null/some_test_content_path_1',
-         'name': 'default'},
-        {'content_path': '/dev/null/some_test_content_path_2',
-         'name': 'system'},
+         '/dev/null/some_test_content_path_1',
+         '/dev/null/some_test_content_path_2',
     ]
 
     config_obj = {'servers': test_servers,
@@ -213,8 +205,7 @@ def test_context_from_config_and_options():
     assert isinstance(galaxy_context.servers, list)
     assert len(galaxy_context.content_roots) == 3
     assert len(galaxy_context.servers) == 3
-    assert galaxy_context.content_roots[0]['content_path'] == content_path
-    assert galaxy_context.content_roots[0]['name'] == 'cli_option'
+    assert galaxy_context.content_roots[0] == content_path
     assert galaxy_context.servers[0]['url'] == server_url
     assert galaxy_context.servers[0]['ignore_certs'] == ignore_certs
 

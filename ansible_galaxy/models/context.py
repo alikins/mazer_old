@@ -62,7 +62,7 @@ class GalaxyContext(object):
         if not self.content_roots:
             return None
         # Default to first content_root in the list
-        return self.content_roots[0]['content_path']
+        return self.content_roots[0]
 
     @classmethod
     def from_config_and_options(cls, config, options):
@@ -70,13 +70,13 @@ class GalaxyContext(object):
         servers_from_config = config.get('servers', [])
         content_roots_from_config = config.get('content_roots', [])
 
+        # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
         _content_roots = []
         _servers = []
 
         if options:
             if getattr(options, 'content_path', None):
-                cli_content_root = {'content_path': options.content_path,
-                                    'name': 'cli_option'}
+                cli_content_root = options.content_path
 
                 _content_roots = [cli_content_root]
 
@@ -84,9 +84,11 @@ class GalaxyContext(object):
             # for use with a legacy role and we want to maintain backwards compat
             if getattr(options, 'roles_path', None):
                 log.warn('Assuming content is of type "role" since --role-path was used')
-                cli_roles_path_content_root = {'content_path': options.roles_path,
-                                               'name': 'cli_option_roles_path'}
-                _content_roots = [cli_roles_path_content_root]
+                _content_roots = []
+                for role_path in options.roles_path:
+                    cli_roles_path_content_root = role_path
+                    _content_roots.append(cli_roles_path_content_root)
+                # _content_roots = [cli_roles_path_content_root]
                 # create a new content_root
                 # self.galaxy.content_path = self.options.roles_path
                 # self.galaxy.options.content_type = 'role'
@@ -101,7 +103,10 @@ class GalaxyContext(object):
                 _servers = [cli_server]
 
         # list of dicts with 'name' and 'content_path' items
-        content_roots = _content_roots + content_roots_from_config[:]
+        raw_content_roots = _content_roots + content_roots_from_config[:]
+
+        log.debug('raw_content_roots: %s', raw_content_roots)
+        content_roots = [os.path.expanduser(p) for p in raw_content_roots]
 
         # list of dicts of url, ignore_certs, token keys
         servers = _servers + servers_from_config[:]
