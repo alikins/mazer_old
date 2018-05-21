@@ -55,9 +55,6 @@ def setup(logging_config=None):
 
     conf = logging.config.dictConfig(logging_config)
 
-    # import logging_tree
-    # logging_tree.printout()
-
     return conf
 
 
@@ -78,15 +75,22 @@ def load_config_yaml(config_file_path):
 def setup_default():
     logging_config = None
 
+    # fallback is basically no setup, null handler, etc
+    # builtin, doesn't depend on yaml config
+    conf = setup(FALLBACK_LOGGING_CONFIG)
+
+    # load the more extensive defaults from DEFAULT_LOGGING_CONFIG_YAML
+    default_logging_config = load_config_yaml(DEFAULT_LOGGING_CONFIG_YAML)
+    if default_logging_config:
+        conf = setup(default_logging_config)
+
     # load custom logging config
     logging_config = load_config_yaml(LOGGING_CONFIG_YAML)
 
-    # if there is no custom config, load the default
-    if not logging_config:
-        logging_config = load_config_yaml(DEFAULT_LOGGING_CONFIG_YAML)
+    if logging_config:
+        setup(logging_config)
 
-    # fallback is basically no setup, null handler, etc
-    if not logging_config:
-        logging_config = FALLBACK_LOGGING_CONFIG
+    # import logging_tree
+    # logging_tree.printout()
 
-    return setup(logging_config)
+    return conf

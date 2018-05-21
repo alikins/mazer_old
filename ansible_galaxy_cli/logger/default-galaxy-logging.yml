@@ -34,14 +34,8 @@ loggers:
     level: DEBUG
   ansible_galaxy.archive.extract:
     level: INFO
-  ansible_galaxy.flat_rest_api:
-    level: DEBUG
-  ansible_galaxy.flat_rest_api.content:
-    level: DEBUG
   ansible_galaxy.flat_rest_api.api.(http):
     level: INFO
-    handlers:
-      - file
 # to log verbose debug level logging to http_file handler:
 #   level: DEBUG
 #   handlers:
