@@ -23,55 +23,105 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import logging
 import os
 
-from ansible_galaxy.config import defaults
+log = logging.getLogger(__name__)
 
 
 class GalaxyContext(object):
     ''' Keeps global galaxy info '''
 
-    def __init__(self, options, server_url=None, ignore_certs=False):
+    def __init__(self, content_roots=None, servers=None):
 
-        self.options = options
-        # self.options.roles_path needs to be a list and will be by default
-        roles_path = getattr(self.options, 'roles_path', [])
+        log.debug('content_roots: %s', content_roots)
+        log.debug('servers: %s', servers)
 
-        # cli option handling is responsible for making roles_path a list
-        self.roles_paths = roles_path
+        self.servers = servers or []
+        self.content_roots = content_roots or []
 
-        default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
-        content_paths = getattr(self.options, 'content_path', [])
+        # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
+        # content_paths = getattr(self.options, 'content_path', [])
 
-        self.content_paths = content_paths + default_content_paths
+    @property
+    def server_url(self):
+        if not self.servers:
+            return None
+        # Default to first server in the list
+        return self.servers[0]['url']
 
-        self.roles = {}
+    @property
+    def ignore_certs(self):
+        if not self.servers:
+            return None
+        # Default to first server in the list
+        return self.servers[0]['ignore_certs']
 
-        # FIXME self.content will eventually replace self.roles when we're ready
-        # to deprecate
-        self.content = {}
+    @property
+    def content_path(self):
+        if not self.content_roots:
+            return None
+        # Default to first content_root in the list
+        return self.content_roots[0]['content_path']
 
-        self.server_url = server_url
-        self.ignore_certs = ignore_certs
+    @classmethod
+    def from_config_and_options(cls, config, options):
+        '''Create a GalaxyContext based on config data and cli options'''
+        servers_from_config = config.get('servers', [])
+        content_roots_from_config = config.get('content_roots', [])
 
-        # load data path for resource usage
-        # FIXME/TODO(akl): Need better way to find this other than __file__
-        # this_dir, this_filename = os.path.split(__file__)
-        # type_path = getattr(self.options, 'role_type', "default")
-        # self.DATA_PATH = os.path.join(this_dir, 'data', type_path)
+        _content_roots = []
+        _servers = []
+
+        if options:
+            if getattr(options, 'content_path', None):
+                cli_content_root = {'content_path': options.content_path,
+                                    'name': 'cli_option'}
+
+                _content_roots = [cli_content_root]
+
+            # If someone provides a --roles-path at the command line, we assume this is
+            # for use with a legacy role and we want to maintain backwards compat
+            if getattr(options, 'roles_path', None):
+                log.warn('Assuming content is of type "role" since --role-path was used')
+                cli_roles_path_content_root = {'content_path': options.roles_path,
+                                               'name': 'cli_option_roles_path'}
+                _content_roots = [cli_roles_path_content_root]
+                # create a new content_root
+                # self.galaxy.content_path = self.options.roles_path
+                # self.galaxy.options.content_type = 'role'
+
+            # if a server was provided via cli, prepend it to the server list
+            if getattr(options, 'server_url', None):
+                cli_server = {'url': options.server_url}
+
+                ignore_certs = options.ignore_certs or False
+                cli_server['ignore_certs'] = ignore_certs
+
+                _servers = [cli_server]
+
+        # list of dicts with 'name' and 'content_path' items
+        content_roots = _content_roots + content_roots_from_config[:]
+
+        # list of dicts of url, ignore_certs, token keys
+        servers = _servers + servers_from_config[:]
+
+        inst = cls(content_roots=content_roots, servers=servers)
+
+        return inst
 
     def __repr__(self):
-        return 'GalaxyContext(roles_path=%s, content_paths=%s, roles=%s, options=%s)' % \
-            (self.roles_paths, self.content_paths, self.roles, self.options)
+        return 'GalaxyContext(content_roots=%s, servers=%s)' % \
+            (self.content_roots, self.servers)
 
-    def add_role(self, role):
-        self.roles[role.name] = role
+    # def add_role(self, role):
+    #    self.roles[role.name] = role
 
-    def remove_role(self, role_name):
-        del self.roles[role_name]
+    # def remove_role(self, role_name):
+    #    del self.roles[role_name]
 
-    def add_content(self, content):
-        self.content[content.name] = content
+    # def add_content(self, content):
+    #    self.content[content.name] = content
 
-    def remove_content(self, content_name):
-        del self.content[content_name]
+    # def remove_content(self, content_name):
+    #     del self.content[content_name]

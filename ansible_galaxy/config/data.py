@@ -37,8 +37,6 @@ DEFAULTS = [
 
     # runtime options
     ('options', {
-        'verbosity': 0,
-        'local_tmp': '~/.ansible/tmp',
         'role_skeleton_path': None,
         'role_skeleton_ignore': ["^.git$", "^.*/.git_keep$"],
     }),
