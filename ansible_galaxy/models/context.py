@@ -71,27 +71,23 @@ class GalaxyContext(object):
         content_roots_from_config = config.get('content_roots', [])
 
         # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
-        _content_roots = []
         _servers = []
 
+        # FIXME(alikins): changed my mind, should move this back to cli/ code
         if options:
             if getattr(options, 'content_path', None):
-                cli_content_root = options.content_path
+                _option_content_paths = []
 
-                _content_roots = [cli_content_root]
+                for content_path in options.content_path:
+                    _option_content_paths.append(content_path)
 
             # If someone provides a --roles-path at the command line, we assume this is
             # for use with a legacy role and we want to maintain backwards compat
             if getattr(options, 'roles_path', None):
                 log.warn('Assuming content is of type "role" since --role-path was used')
-                _content_roots = []
+                _option_role_paths = []
                 for role_path in options.roles_path:
-                    cli_roles_path_content_root = role_path
-                    _content_roots.append(cli_roles_path_content_root)
-                # _content_roots = [cli_roles_path_content_root]
-                # create a new content_root
-                # self.galaxy.content_path = self.options.roles_path
-                # self.galaxy.options.content_type = 'role'
+                    _option_role_paths.append(role_path)
 
             # if a server was provided via cli, prepend it to the server list
             if getattr(options, 'server_url', None):
@@ -103,7 +99,8 @@ class GalaxyContext(object):
                 _servers = [cli_server]
 
         # list of dicts with 'name' and 'content_path' items
-        raw_content_roots = _content_roots + content_roots_from_config[:]
+        # cli --content-paths is hight priority, then --role-path, then configured content-paths
+        raw_content_roots = _option_content_paths + _option_role_paths + content_roots_from_config[:]
 
         log.debug('raw_content_roots: %s', raw_content_roots)
         content_roots = [os.path.expanduser(p) for p in raw_content_roots]
