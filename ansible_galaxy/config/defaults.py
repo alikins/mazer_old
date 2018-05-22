@@ -1,11 +1,31 @@
 
-# NOTE: string but ansible parses path spec
-# FIXME: just make a list. Add a patchspec type?
-DEFAULT_CONTENT_PATH = ['~/.ansible/content', '/usr/share/ansible/content']
+# a list of tuples that is fed to an OrderedDict
+DEFAULTS = [
+    # defaults ?
+    ('defaults', {}),
 
-# FIXME: dunno yet
+    #
+    ('servers',  [
+        {'url': 'https://galaxy-qa.ansible.com',
+         'validate_certs': True,
+         'token': None,
+         },
+    ]),
 
-DEFAULT_LOCAL_TMP = "~/.ansible/tmp"
+    # In order of priority
+    ('content_roots', [
+        '~/.ansible/content',
+        '/usr/share/ansible/content',
+    ]),
+
+    # runtime options
+    ('options', {
+        'role_skeleton_path': None,
+        'role_skeleton_ignore': ["^.git$", "^.*/.git_keep$"],
+    }),
+    ('version', 1),
+]
 
 # FIXME: replace with logging config
-DEFAULT_VERBOSITY = 0
+VERBOSITY = 0
+CONFIG_FILE = '~/.ansible/galaxy.yml'

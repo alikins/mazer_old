@@ -121,7 +121,6 @@ class GalaxyContent(object):
         self._metadata = None
 
         self._install_info = None
-        self._validate_certs = not galaxy.ignore_certs
 
         self.log = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
@@ -129,6 +128,11 @@ class GalaxyContent(object):
 
         # self.options = galaxy.options
         self.galaxy = galaxy
+
+        # FIXME: validate_certs is an option for two different things,
+        #        the connection to the galaxy_server (eg, galaxy.ansible.com)
+        #        and to where archives are downloaded (eg, github)
+        self._validate_certs = not galaxy.server['ignore_certs']
 
         # FIXME
         self.sub_name = sub_name

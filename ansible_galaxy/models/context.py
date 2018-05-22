@@ -44,18 +44,19 @@ class GalaxyContext(object):
         # content_paths = getattr(self.options, 'content_path', [])
 
     @property
+    def server(self):
+        if not self.servers:
+            return None
+        # Default to first server in the list
+        return self.servers[0]
+
+    # FIXME: rm
+    @property
     def server_url(self):
         if not self.servers:
             return None
         # Default to first server in the list
         return self.servers[0]['url']
-
-    @property
-    def ignore_certs(self):
-        if not self.servers:
-            return None
-        # Default to first server in the list
-        return self.servers[0]['ignore_certs']
 
     @property
     def content_path(self):
@@ -67,11 +68,12 @@ class GalaxyContext(object):
     @classmethod
     def from_config_and_options(cls, config, options):
         '''Create a GalaxyContext based on config data and cli options'''
-        servers_from_config = config.get('servers', [])
-        content_roots_from_config = config.get('content_roots', [])
+        servers_from_config = config.servers
+        content_roots_from_config = config.content_roots
 
-        # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
         _servers = []
+        _option_content_paths = []
+        _option_role_paths = []
 
         # FIXME(alikins): changed my mind, should move this back to cli/ code
         if options:

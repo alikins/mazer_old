@@ -34,9 +34,10 @@ from jinja2 import Environment, FileSystemLoader
 
 from ansible_galaxy_cli import cli
 from ansible_galaxy_cli import __version__ as galaxy_cli_version
+from ansible_galaxy.config import defaults
 from ansible_galaxy.config import runtime
-from ansible_galaxy.config.data import config_load, config_save
-# from ansible_galaxy.config.file import config_load, config_save
+from ansible_galaxy.config.config import Config
+from ansible_galaxy.config.data import config_load
 from ansible_galaxy import exceptions
 from ansible_galaxy_cli import exceptions as cli_exceptions
 from ansible_galaxy.models.context import GalaxyContext
@@ -173,13 +174,18 @@ class GalaxyCLI(cli.CLI):
 
     def run(self):
 
+        self.config_file = defaults.CONFIG_FILE
+
         super(GalaxyCLI, self).run()
 
-        self.config = config_load()
+        config_data = config_load(file_path=self.config_file)
+        log.debug('config_data: %s', config_data)
+
+        self.config = Config.from_dict(config_data)
 
         log.debug(self.config)
         import json
-        log.debug(json.dumps(self.config, indent=4))
+        log.debug(json.dumps(self.config.as_dict(), indent=4))
 
         # cli --server value or the url field of the first server in config
         # TODO: pass list of server config objects to GalaxyContext and/or create a GalaxyContext later
@@ -285,7 +291,7 @@ class GalaxyCLI(cli.CLI):
             os.makedirs(role_path)
 
         if role_skeleton_path is not None:
-            skeleton_ignore_expressions = runtime.GALAXY_ROLE_SKELETON_IGNORE
+            skeleton_ignore_expressions = self.config.OPTIONS['role_skeleton_ignore']
         else:
             this_dir, this_filename = os.path.split(__file__)
 
@@ -794,10 +800,12 @@ class GalaxyCLI(cli.CLI):
         """
         verify user's identify via Github and retrieve an auth token from Ansible Galaxy.
         """
+
+        galaxy_context = GalaxyContext.from_config_and_options(self.config, self.options)
         # Authenticate with github and retrieve a token
         if self.options.token is None:
-            if runtime.GALAXY_TOKEN:
-                github_token = runtime.GALAXY_TOKEN
+            if galaxy_context.server['token']:
+                github_token = galaxy_context.server['token']
             else:
                 login = GalaxyLogin(self.galaxy)
                 github_token = login.create_github_token()
@@ -936,8 +944,8 @@ class GalaxyCLI(cli.CLI):
         self.display('Ansible Galaxy CLI, version', galaxy_cli_version)
         self.display(', '.join(os.uname()))
         self.display(sys.version, sys.executable)
-        if runtime.CONFIG_FILE:
-            self.display(u"Using %s as config file", to_text(runtime.CONFIG_FILE))
+        if self.config_file:
+            self.display(u"Using %s as config file", to_text(self.config_file))
         else:
             self.display(u"No config file found; using defaults")
         return True

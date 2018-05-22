@@ -1,6 +1,6 @@
 defaults: {}
 servers:
-  - ignore_certs: false
+  - validate_certs: true
     token: null
     url: https://galaxy-qa.ansible.com
     # url: http://localhost:8000

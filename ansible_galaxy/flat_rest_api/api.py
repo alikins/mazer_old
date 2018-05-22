@@ -66,17 +66,20 @@ class GalaxyAPI(object):
 
     SUPPORTED_VERSIONS = ['v1']
 
+    # FIXME: just pass in server_url
     def __init__(self, galaxy):
         self.galaxy = galaxy
         self.token = GalaxyToken()
-        self._validate_certs = not galaxy.ignore_certs
+        log.debug('galaxy: %s', galaxy)
+        log.debug('galaxy.server: %s', galaxy.server)
+        self._validate_certs = not galaxy.server['ignore_certs']
         self.baseurl = None
         self.version = None
         self.initialized = False
         self.log = logging.getLogger(__name__ + '.' + self.__class__.__name__)
 
         # set the API server
-        self._api_server = galaxy.server_url
+        self._api_server = galaxy.server['url']
         self.log.debug('Validate TLS certificates for %s: %s', self._api_server, self._validate_certs)
 
     def __auth_header(self):
