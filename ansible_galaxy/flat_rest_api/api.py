@@ -30,7 +30,6 @@ from six.moves.urllib.parse import quote as urlquote, urlencode
 import socket
 import ssl
 
-from ansible_galaxy.flat_rest_api.token import GalaxyToken
 from ansible_galaxy import exceptions
 from ansible_galaxy.utils.text import to_native, to_text
 
@@ -68,7 +67,6 @@ class GalaxyAPI(object):
     # FIXME: just pass in server_url
     def __init__(self, galaxy):
         self.galaxy = galaxy
-        self.token = GalaxyToken()
         log.debug('galaxy: %s', galaxy)
         log.debug('galaxy.server: %s', galaxy.server)
         self._validate_certs = not galaxy.server['ignore_certs']
@@ -81,17 +79,11 @@ class GalaxyAPI(object):
         self._api_server = galaxy.server['url']
         self.log.debug('Validate TLS certificates for %s: %s', self._api_server, self._validate_certs)
 
-    def __auth_header(self):
-        token = self.token.get()
-        if token is None:
-            raise exceptions.GalaxyClientError("No access token. You must first use login to authenticate and obtain an access token.")
-        return {'Authorization': 'Token ' + token}
-
     # TODO: raise an API/net specific exception?
     @g_connect
     def __call_galaxy(self, url, args=None, headers=None, method=None):
-        if args and not headers:
-            headers = self.__auth_header()
+        headers = headers or {}
+
         try:
             http_log.info('%s %s', method, url)
             request_log.debug('%s %s args=%s', method, url, args)
@@ -168,19 +160,6 @@ class GalaxyAPI(object):
             raise exceptions.GalaxyClientError("missing required 'current_version' from server response (%s)" % url)
 
         return data['current_version']
-
-    @g_connect
-    def authenticate(self, github_token):
-        """
-        Retrieve an authentication token
-        """
-        self.log.debug('authenticate')
-
-        url = '%s/tokens/' % self.baseurl
-        args = urlencode({"github_token": github_token})
-        resp = open_url(url, data=args, validate_certs=self._validate_certs, method="POST")
-        data = json.loads(to_text(resp.read(), errors='surrogate_or_strict'))
-        return data
 
     @g_connect
     def create_import_task(self, github_user, github_repo, reference=None, role_name=None):
@@ -284,16 +263,6 @@ class GalaxyAPI(object):
             return data["results"][0]
         return None
 
-    # @g_connect
-    # def fetch_content_related(self, related_url):
-    #    "Fetch a related item for the given content"
-    #    self.log.debug('related_url=%s', related_url)
-    #    url = '%s%s' % (self._api_server, related_url)
-    #    data = self.__call_galaxy(url)
-    #    if len(data["results"]) != 0:
-    #        return data["results"][0]
-    #    return None
-
     @g_connect
     def fetch_content_related(self, related_url):
         """
@@ -394,22 +363,4 @@ class GalaxyAPI(object):
             "secret": secret
         })
         data = self.__call_galaxy(url, args=args)
-        return data
-
-    @g_connect
-    def list_secrets(self):
-        url = "%s/notification_secrets" % self.baseurl
-        data = self.__call_galaxy(url, headers=self.__auth_header())
-        return data
-
-    @g_connect
-    def remove_secret(self, secret_id):
-        url = "%s/notification_secrets/%s/" % (self.baseurl, secret_id)
-        data = self.__call_galaxy(url, headers=self.__auth_header(), method='DELETE')
-        return data
-
-    @g_connect
-    def delete_role(self, github_user, github_repo):
-        url = "%s/removerole/?github_user=%s&github_repo=%s" % (self.baseurl, github_user, github_repo)
-        data = self.__call_galaxy(url, headers=self.__auth_header(), method='DELETE')
         return data
