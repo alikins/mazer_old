@@ -28,7 +28,6 @@ import os
 import re
 import shutil
 import sys
-import time
 import yaml
 
 from jinja2 import Environment, FileSystemLoader
@@ -36,7 +35,6 @@ from jinja2 import Environment, FileSystemLoader
 from ansible_galaxy_cli import cli
 from ansible_galaxy_cli import __version__ as galaxy_cli_version
 from ansible_galaxy.config import defaults
-from ansible_galaxy.config import runtime
 from ansible_galaxy.config import config
 from ansible_galaxy import exceptions
 from ansible_galaxy_cli import exceptions as cli_exceptions
@@ -60,7 +58,7 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("import", "info", "init", "install", "content-install", "list", "remove", "search", "version")
+    VALID_ACTIONS = ("info", "init", "install", "content-install", "list", "remove", "search", "version")
 
     def __init__(self, args):
         self.api = None
@@ -71,15 +69,7 @@ class GalaxyCLI(cli.CLI):
         super(GalaxyCLI, self).set_action()
 
         # specific to actions
-        if self.action == "import":
-            self.parser.set_usage("usage: %prog import [options] github_user github_repo")
-            self.parser.add_option('--no-wait', dest='wait', action='store_false', default=True, help='Don\'t wait for import results.')
-            self.parser.add_option('--branch', dest='reference',
-                                   help='The name of a branch to import. Defaults to the repository\'s default branch (usually master)')
-            self.parser.add_option('--role-name', dest='role_name', help='The name the role should have, if different than the repo name')
-            self.parser.add_option('--status', dest='check_status', action='store_true', default=False,
-                                   help='Check the status of the most recent import request for given github_user/github_repo.')
-        elif self.action == "info":
+        if self.action == "info":
             self.parser.set_usage("usage: %prog info [options] role_name[,version]")
 
         elif self.action == "init":
@@ -130,7 +120,7 @@ class GalaxyCLI(cli.CLI):
         if self.action in ['init', 'info']:
             self.parser.add_option('--offline', dest='offline', default=False, action='store_true', help="Don't query the galaxy API when creating roles")
 
-        if self.action not in ("import", "init", "version"):
+        if self.action not in ("init", "version"):
             # NOTE: while the option type=str, the default is a list, and the
             # callback will set the value to a list.
             self.parser.add_option('-p', '--roles-path', dest='roles_path', action="append", default=[],
@@ -805,64 +795,6 @@ class GalaxyCLI(cli.CLI):
         data = u'\n'.join(data)
         self.display(data)
         return True
-
-    def execute_import(self):
-        """ used to import a role into Ansible Galaxy """
-
-        # FIXME/TODO(alikins): replace with logging or display callback
-        colors = {
-            'INFO': 'normal',
-            'WARNING': runtime.COLOR_WARN,
-            'ERROR': runtime.COLOR_ERROR,
-            'SUCCESS': runtime.COLOR_OK,
-            'FAILED': runtime.COLOR_ERROR,
-            'DEBUG': runtime.COLOR_DEBUG,
-        }
-
-        if len(self.args) < 2:
-            raise cli_exceptions.GalaxyCliError("Expected a github_username and github_repository. Use --help.")
-
-        github_repo = to_text(self.args.pop(), errors='surrogate_or_strict')
-        github_user = to_text(self.args.pop(), errors='surrogate_or_strict')
-
-        if self.options.check_status:
-            task = self.api.get_import_task(github_user=github_user, github_repo=github_repo)
-        else:
-            # Submit an import request
-            task = self.api.create_import_task(github_user, github_repo, reference=self.options.reference, role_name=self.options.role_name)
-
-            if len(task) > 1:
-                # found multiple roles associated with github_user/github_repo
-                self.display("WARNING: More than one Galaxy role associated with Github repo %s/%s." % (github_user, github_repo),
-                             color='yellow')
-                self.display("The following Galaxy roles are being updated:" + u'\n', color=runtime.COLOR_CHANGED)
-                for t in task:
-                    self.display('%s.%s' % (t['summary_fields']['role']['namespace'], t['summary_fields']['role']['name']), color=runtime.COLOR_CHANGED)
-                    self.display(u'\nTo properly namespace this role, remove each of the above and re-import %s/%s from scratch' % (github_user, github_repo),
-                                 color=runtime.COLOR_CHANGED)
-                return 0
-            # found a single role as expected
-            self.display("Successfully submitted import request %d" % task[0]['id'])
-            if not self.options.wait:
-                self.display("Role name: %s" % task[0]['summary_fields']['role']['name'])
-                self.display("Repo: %s/%s" % (task[0]['github_user'], task[0]['github_repo']))
-
-        if self.options.check_status or self.options.wait:
-            # Get the status of the import
-            msg_list = []
-            finished = False
-            while not finished:
-                task = self.api.get_import_task(task_id=task[0]['id'])
-                for msg in task[0]['summary_fields']['task_messages']:
-                    if msg['id'] not in msg_list:
-                        self.display(msg['message_text'], color=colors[msg['message_type']])
-                        msg_list.append(msg['id'])
-                if task[0]['state'] in ['SUCCESS', 'FAILED']:
-                    finished = True
-                else:
-                    time.sleep(10)
-
-        return 0
 
     def execute_version(self):
         self.display('Ansible Galaxy CLI, version', galaxy_cli_version)

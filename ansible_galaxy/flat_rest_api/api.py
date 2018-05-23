@@ -162,52 +162,6 @@ class GalaxyAPI(object):
         return data['current_version']
 
     @g_connect
-    def create_import_task(self, github_user, github_repo, reference=None, role_name=None):
-        """
-        Post an import request
-        """
-
-        self.log.debug('github_user=%s', github_user)
-        self.log.debug('github_repo=%s', github_repo)
-        self.log.debug('reference=%s', reference)
-        self.log.debug('role_name=%s', role_name)
-
-        url = '%s/imports/' % self.baseurl
-        args = {
-            "github_user": github_user,
-            "github_repo": github_repo,
-            "github_reference": reference if reference else ""
-        }
-        if role_name:
-            args['alternate_role_name'] = role_name
-        elif github_repo.startswith('ansible-role'):
-            args['alternate_role_name'] = github_repo[len('ansible-role') + 1:]
-        data = self.__call_galaxy(url, args=urlencode(args), method='POST')
-        if data.get('results', None):
-            return data['results']
-        return data
-
-    @g_connect
-    def get_import_task(self, task_id=None, github_user=None, github_repo=None):
-        """
-        Check the status of an import task.
-        """
-        self.log.debug('task_id=%s', task_id)
-        self.log.debug('github_user=%s', github_user)
-        self.log.debug('github_repo=%s', github_repo)
-
-        url = '%s/imports/' % self.baseurl
-        if task_id is not None:
-            url = "%s?id=%d" % (url, task_id)
-        elif github_user is not None and github_repo is not None:
-            url = "%s?github_user=%s&github_repo=%s" % (url, github_user, github_repo)
-        else:
-            raise exceptions.GalaxyClientError("Expected task_id or github_user and github_repo")
-
-        data = self.__call_galaxy(url)
-        return data['results']
-
-    @g_connect
     def lookup_repo_by_name(self, namespace, name):
         self.log.debug('user_name=%s', namespace)
         self.log.debug('name=%s', name)
