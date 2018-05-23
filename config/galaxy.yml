@@ -1,12 +1,8 @@
 defaults: {}
-servers:
-  - validate_certs: true
-    token: null
-    url: https://galaxy-qa.ansible.com
-    # url: http://localhost:8000
-content_roots:
-  - ~/.ansible/content
-  - /usr/share/ansible/content
+server:
+  ignore_certs: false
+  url: https://galaxy-qa.ansible.com
+content_path: ~/.ansible/content
 options:
   local_tmp: ~/.ansible/tmp
   role_skeleton_ignore:
