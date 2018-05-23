@@ -1,4 +1,6 @@
+from collections import OrderedDict
 import logging
+import tempfile
 
 from ansible_galaxy.config import config
 
@@ -34,15 +36,18 @@ def test_config_unknown_attr():
 
 
 def test_config_from_empty_dict():
-    config_data = {}
+    config_data = OrderedDict({})
     _config = config.Config.from_dict(config_data)
     assert_object(_config)
 
 
 def test_config_from_dict():
-    config_data = {'options': {'some_option': 'some_option_value'},
-                   'defaults': {'some_default_key': 'some_default_value'},
-                   }
+    config_data = OrderedDict(
+        (
+            ('options', {'some_option': 'some_option_value'}),
+            ('defaults', {'some_default_key': 'some_default_value'}),
+        )
+    )
 
     _config = config.Config.from_dict(config_data)
     assert_object(_config)
@@ -60,12 +65,15 @@ def test_config_as_dict_empty():
 
 
 def test_config_as_dict():
-    orig_config_data = {
-        'defaults': {'some_default_key': 'some_default_value'},
-        'servers': [{'url': 'some_url_value'}],
-        'content_roots': [],
-        'options': {'some_option': 'some_option_value'},
-    }
+    orig_config_data = OrderedDict(
+        (
+            ('defaults', {'some_default_key': 'some_default_value'}),
+            ('servers', [{'url': 'some_url_value'}]),
+            ('content_roots', []),
+            ('options', {'some_option': 'some_option_value'}),
+        )
+    )
+
     _config = config.Config.from_dict(orig_config_data)
 
     config_data = _config.as_dict()
@@ -96,3 +104,52 @@ def test_config_as_dict_from_partial_dict():
 
     assert isinstance(config_data['content_roots'], list)
     assert config_data['content_roots'] == []
+
+
+def test_load_empty():
+    yaml_fo = tempfile.NamedTemporaryFile()
+
+    _config = config.load(yaml_fo.name)
+
+    assert_object(_config)
+    log.debug('data: %s', _config.as_dict())
+
+
+def test_save_empty():
+    yaml_fo = tempfile.NamedTemporaryFile()
+
+    _config = config.Config()
+
+    res = config.save(_config, yaml_fo.name)
+
+    res_fo = open(yaml_fo.name, 'r')
+
+    written_yaml = res_fo.read()
+    log.debug('written_yaml: %s', written_yaml)
+
+    assert written_yaml != ''
+    assert 'defaults' in written_yaml
+
+
+def test_save():
+    yaml_fo = tempfile.NamedTemporaryFile()
+
+    _config = config.Config()
+
+    _config.defaults['some_default'] = 'some_default_value'
+    _config.options['some_option'] = 'some_option_value'
+
+    res = config.save(_config, yaml_fo.name)
+
+    res_fo = open(yaml_fo.name, 'r')
+
+    written_yaml = res_fo.read()
+    log.debug('written_yaml: %s', written_yaml)
+
+    assert written_yaml != ''
+    expected_strs = ['defaults',
+                     'some_option', 'some_option_value',
+                     'some_default', 'some_default_value']
+    for expected_str in expected_strs:
+        assert expected_str in written_yaml, \
+            'expected to find the string "%s" in written config file but did not. file contents: %s' % (expected_str, written_yaml)

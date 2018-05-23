@@ -15,12 +15,14 @@ class Config(object):
         self.options = {}
 
     def as_dict(self):
-        return {
-            'defaults': self.defaults,
-            'servers': self.servers,
-            'content_roots': self.content_roots,
-            'options': self.options,
-        }
+        return collections.OrderedDict(
+            (
+                ('defaults', self.defaults),
+                ('servers', self.servers),
+                ('content_roots', self.content_roots),
+                ('options', self.options),
+            )
+        )
 
     @classmethod
     def from_dict(cls, data):
