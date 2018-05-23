@@ -214,17 +214,16 @@ class TestGalaxy(unittest.TestCase):
                 'init': 'usage: %prog init [options] role_name',
                 'install': 'usage: %prog install [options] [-r FILE | role_name(s)[,version] | scm+role_repo_url[,version] | tar_file(s)]',
                 'list': 'usage: %prog list [role_name]',
-                'login': 'usage: %prog login [options]',
                 'remove': 'usage: %prog remove role1 role2 ...',
                 'search': ('usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] '
                            '[--author username]'),
                 'setup': 'usage: %prog setup [options] source github_user github_repo secret',
             }
 
-            first_call = 'usage: %prog [delete|import|info|init|install|list|login|remove|search|setup] [--help] [options] ...'
+            first_call = 'usage: %prog [delete|import|info|init|install|content-install|list|remove|search|setup|version] [--help] [options] ...'
             second_call = formatted_call[action]
             calls = [call(first_call), call(second_call)]
-            # mocked_usage.assert_has_calls(calls)
+            mocked_usage.assert_has_calls(calls)
 
     def test_parse_no_action(self):
         ''' testing the options parser when no action is given '''
@@ -278,13 +277,6 @@ class TestGalaxy(unittest.TestCase):
         gc = GalaxyCLI(args=["ansible-galaxy", "list"])
         self.run_parse_common(gc, "list")
         self.assertEqual(gc.options.verbosity, 0)
-
-    def test_parse_login(self):
-        ''' testing the options parser when the action 'login' is given '''
-        gc = GalaxyCLI(args=["ansible-galaxy", "login"])
-        self.run_parse_common(gc, "login")
-        self.assertEqual(gc.options.verbosity, 0)
-        self.assertEqual(gc.options.token, None)
 
     def test_parse_remove(self):
         ''' testing the options parser when the action 'remove' is given '''

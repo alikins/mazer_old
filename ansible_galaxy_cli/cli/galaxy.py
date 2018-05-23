@@ -48,9 +48,7 @@ from ansible_galaxy.utils.content_name import parse_content_name
 # FIXME: importing class, fix name collision later or use this style
 # TODO: replace flat_rest_api with a OO interface
 from ansible_galaxy.flat_rest_api.api import GalaxyAPI
-from ansible_galaxy.flat_rest_api.login import GalaxyLogin
 from ansible_galaxy.flat_rest_api.content import GalaxyContent
-from ansible_galaxy.flat_rest_api.token import GalaxyToken
 
 # FIXME: not a model...
 from ansible_galaxy.models.content import CONTENT_TYPES
@@ -62,7 +60,7 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("delete", "import", "info", "init", "install", "content-install", "list", "login", "remove", "search", "setup", "version")
+    VALID_ACTIONS = ("delete", "import", "info", "init", "install", "content-install", "list", "remove", "search", "setup", "version")
 
     def __init__(self, args):
         self.api = None
@@ -121,9 +119,6 @@ class GalaxyCLI(cli.CLI):
             self.parser.set_usage("usage: %prog remove role1 role2 ...")
         elif self.action == "list":
             self.parser.set_usage("usage: %prog list [role_name]")
-        elif self.action == "login":
-            self.parser.set_usage("usage: %prog login [options]")
-            self.parser.add_option('--github-token', dest='token', default=None, help='Identify with github token rather than username and password.')
         elif self.action == "search":
             self.parser.set_usage("usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] "
                                   "[--author username]")
@@ -142,7 +137,7 @@ class GalaxyCLI(cli.CLI):
         if self.action in ['init', 'info']:
             self.parser.add_option('--offline', dest='offline', default=False, action='store_true', help="Don't query the galaxy API when creating roles")
 
-        if self.action not in ("delete", "import", "init", "login", "setup", "version"):
+        if self.action not in ("delete", "import", "init", "setup", "version"):
             # NOTE: while the option type=str, the default is a list, and the
             # callback will set the value to a list.
             self.parser.add_option('-p', '--roles-path', dest='roles_path', action="append", default=[],
@@ -817,36 +812,6 @@ class GalaxyCLI(cli.CLI):
         data = u'\n'.join(data)
         self.display(data)
         return True
-
-    # TODO: remove
-    def execute_login(self):
-        """
-        verify user's identify via Github and retrieve an auth token from Ansible Galaxy.
-        """
-
-        galaxy_context = self._get_galaxy_context(self.options, self.config)
-        # Authenticate with github and retrieve a token
-        if self.options.token is None:
-            if galaxy_context.server['token']:
-                github_token = galaxy_context.server['token']
-            else:
-                login = GalaxyLogin(galaxy_context)
-                github_token = login.create_github_token()
-        else:
-            github_token = self.options.token
-
-        galaxy_response = self.api.authenticate(github_token)
-
-        if self.options.token is None and runtime.GALAXY_TOKEN is None:
-            # Remove the token we created
-            login.remove_github_token()
-
-        # Store the Galaxy token
-        token = GalaxyToken()
-        token.set(galaxy_response['token'])
-
-        self.display("Successfully logged into Galaxy as %s" % galaxy_response['username'])
-        return 0
 
     def execute_import(self):
         """ used to import a role into Ansible Galaxy """
