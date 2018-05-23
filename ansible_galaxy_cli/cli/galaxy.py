@@ -60,7 +60,7 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("delete", "import", "info", "init", "install", "content-install", "list", "remove", "search", "setup", "version")
+    VALID_ACTIONS = ("delete", "import", "info", "init", "install", "content-install", "list", "remove", "search", "version")
 
     def __init__(self, args):
         self.api = None
@@ -125,11 +125,6 @@ class GalaxyCLI(cli.CLI):
             self.parser.add_option('--platforms', dest='platforms', help='list of OS platforms to filter by')
             self.parser.add_option('--galaxy-tags', dest='galaxy_tags', help='list of galaxy tags to filter by')
             self.parser.add_option('--author', dest='author', help='GitHub username')
-        elif self.action == "setup":
-            self.parser.set_usage("usage: %prog setup [options] source github_user github_repo secret")
-            self.parser.add_option('--remove', dest='remove_id', default=None,
-                                   help='Remove the integration matching the provided ID value. Use --list to see ID values.')
-            self.parser.add_option('--list', dest="setup_list", action='store_true', default=False, help='List all of your integrations.')
         elif self.action == "version":
             self.parser.set_usage("usage: %prog version")
 
@@ -137,7 +132,7 @@ class GalaxyCLI(cli.CLI):
         if self.action in ['init', 'info']:
             self.parser.add_option('--offline', dest='offline', default=False, action='store_true', help="Don't query the galaxy API when creating roles")
 
-        if self.action not in ("delete", "import", "init", "setup", "version"):
+        if self.action not in ("delete", "import", "init", "version"):
             # NOTE: while the option type=str, the default is a list, and the
             # callback will set the value to a list.
             self.parser.add_option('-p', '--roles-path', dest='roles_path', action="append", default=[],
@@ -868,42 +863,6 @@ class GalaxyCLI(cli.CLI):
                     finished = True
                 else:
                     time.sleep(10)
-
-        return 0
-
-    def execute_setup(self):
-        """ Setup an integration from Github or Travis for Ansible Galaxy roles"""
-
-        if self.options.setup_list:
-            # List existing integration secrets
-            secrets = self.api.list_secrets()
-            if len(secrets) == 0:
-                # None found
-                self.display("No integrations found.")
-                return 0
-            self.display(u'\n' + "ID         Source     Repo", color=runtime.COLOR_OK)
-            self.display("---------- ---------- ----------", color=runtime.COLOR_OK)
-            for secret in secrets:
-                self.display("%-10s %-10s %s/%s" % (secret['id'], secret['source'], secret['github_user'],
-                                                    secret['github_repo']), color=runtime.COLOR_OK)
-            return 0
-
-        if self.options.remove_id:
-            # Remove a secret
-            self.api.remove_secret(self.options.remove_id)
-            self.display("Secret removed. Integrations using this secret will not longer work.", color=runtime.COLOR_OK)
-            return 0
-
-        if len(self.args) < 4:
-            raise cli_exceptions.GalaxyCliError("Missing one or more arguments. Expecting: source github_user github_repo secret")
-
-        secret = self.args.pop()
-        github_repo = self.args.pop()
-        github_user = self.args.pop()
-        source = self.args.pop()
-
-        resp = self.api.add_secret(source, github_user, github_repo, secret)
-        self.display("Added integration for %s %s/%s" % (resp['source'], resp['github_user'], resp['github_repo']))
 
         return 0
 

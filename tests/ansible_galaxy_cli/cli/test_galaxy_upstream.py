@@ -217,10 +217,9 @@ class TestGalaxy(unittest.TestCase):
                 'remove': 'usage: %prog remove role1 role2 ...',
                 'search': ('usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] '
                            '[--author username]'),
-                'setup': 'usage: %prog setup [options] source github_user github_repo secret',
             }
 
-            first_call = 'usage: %prog [delete|import|info|init|install|content-install|list|remove|search|setup|version] [--help] [options] ...'
+            first_call = 'usage: %prog [delete|import|info|init|install|content-install|list|remove|search|version] [--help] [options] ...'
             second_call = formatted_call[action]
             calls = [call(first_call), call(second_call)]
             mocked_usage.assert_has_calls(calls)
@@ -291,15 +290,6 @@ class TestGalaxy(unittest.TestCase):
         self.assertEqual(gc.options.platforms, None)
         self.assertEqual(gc.options.galaxy_tags, None)
         self.assertEqual(gc.options.author, None)
-
-    def test_parse_setup(self):
-        ''' testing the options parser when the action 'setup' is given '''
-        gc = GalaxyCLI(args=["ansible-galaxy", "setup"])
-        self.run_parse_common(gc, "setup")
-
-        self.assertEqual(gc.options.verbosity, 0)
-        self.assertEqual(gc.options.remove_id, None)
-        self.assertEqual(gc.options.setup_list, False)
 
 
 class ValidRoleTests(object):
