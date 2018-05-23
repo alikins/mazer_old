@@ -36,8 +36,7 @@ from ansible_galaxy_cli import cli
 from ansible_galaxy_cli import __version__ as galaxy_cli_version
 from ansible_galaxy.config import defaults
 from ansible_galaxy.config import runtime
-from ansible_galaxy.config.config import Config
-from ansible_galaxy.config.data import config_load
+from ansible_galaxy.config import config
 from ansible_galaxy import exceptions
 from ansible_galaxy_cli import exceptions as cli_exceptions
 from ansible_galaxy.models.context import GalaxyContext
@@ -174,14 +173,11 @@ class GalaxyCLI(cli.CLI):
 
     def run(self):
 
-        self.config_file = defaults.CONFIG_FILE
+        self.config_file = os.path.expanduser(defaults.CONFIG_FILE)
 
         super(GalaxyCLI, self).run()
 
-        config_data = config_load(file_path=self.config_file)
-        log.debug('config_data: %s', config_data)
-
-        self.config = Config.from_dict(config_data)
+        self.config = config.load(self.config_file)
 
         log.debug(self.config)
         import json
@@ -431,7 +427,7 @@ class GalaxyCLI(cli.CLI):
 
             # FIXME - add more types here, PoC is just role/module
 
-        #if self.options.content_path:
+        # if self.options.content_path:
         #    self.galaxy.content_paths = self.options.content_path
 
         galaxy_context = GalaxyContext.from_config_and_options(self.config, self.options)
