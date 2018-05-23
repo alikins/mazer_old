@@ -211,6 +211,7 @@ class TestGalaxy(unittest.TestCase):
                 'remove': 'usage: %prog remove role1 role2 ...',
                 'search': ('usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] '
                            '[--author username]'),
+                'version': 'usage: %prog version',
             }
 
             first_call = 'usage: %prog [info|init|install|list|remove|search|version] [--help] [options] ...'
@@ -269,6 +270,12 @@ class TestGalaxy(unittest.TestCase):
         self.assertEqual(gc.options.platforms, None)
         self.assertEqual(gc.options.galaxy_tags, None)
         self.assertEqual(gc.options.author, None)
+
+    def test_parse_version(self):
+        ''' testing the options parser when the action 'version' is given '''
+        gc = GalaxyCLI(args=["ansible-galaxy", "version"])
+        self.run_parse_common(gc, "version")
+        self.assertEqual(gc.options.verbosity, 0)
 
 
 class ValidRoleTests(object):

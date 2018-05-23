@@ -660,7 +660,7 @@ class GalaxyCLI(cli.CLI):
         self.display(', '.join(os.uname()))
         self.display(sys.version, sys.executable)
         if self.config_file_path:
-            self.display(u"Using %s as config file", to_text(self.config_file_path))
+            self.display(u"Using %s as config file" % to_text(self.config_file_path))
         else:
             self.display(u"No config file found; using defaults")
         return True
