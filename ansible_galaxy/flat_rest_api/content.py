@@ -216,7 +216,7 @@ class GalaxyContent(object):
         """
         if self.content_type in ["role", "all"]:
             if self._metadata is None:
-                log.debug('content.meta_path: %s', self.content.meta_path)
+                log.debug('content_meta.path: %s', self.content_meta.path)
                 log.debug('archive.META_MAIN: %s', archive.META_MAIN)
                 meta_path = os.path.join(self.content_meta.path, archive.META_MAIN)
                 if os.path.isfile(meta_path):
