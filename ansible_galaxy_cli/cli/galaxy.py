@@ -172,8 +172,11 @@ class GalaxyCLI(cli.CLI):
 
     def _get_galaxy_context(self, options, config):
         # use content_path from options if availble but fallback to configured content_path
+        options_content_path = None
         if hasattr(options, 'content_path'):
-            raw_content_path = options.content_path or config.content_path
+            options_content_path = options.content_path
+
+        raw_content_path = options_content_path or config.content_path
 
         content_path = os.path.expanduser(raw_content_path)
 
@@ -309,7 +312,7 @@ class GalaxyCLI(cli.CLI):
             os.makedirs(role_path)
 
         if role_skeleton_path is not None:
-            skeleton_ignore_expressions = self.config.OPTIONS['role_skeleton_ignore']
+            skeleton_ignore_expressions = self.config.options['role_skeleton_ignore']
         else:
             this_dir, this_filename = os.path.split(__file__)
 
@@ -711,6 +714,7 @@ class GalaxyCLI(cli.CLI):
                 else:
                     self.display('- %s is not installed, skipping.' % role_name)
             except Exception as e:
+                log.exception(e)
                 raise cli_exceptions.GalaxyCliError("Failed to remove role %s: %s" % (role_name, str(e)))
 
         return 0
