@@ -58,7 +58,8 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("info", "init", "install", "content-install", "list", "remove", "search", "version")
+    VALID_ACTIONS = ("info", "init", "install", "list", "remove", "search", "version")
+    VALID_ACTION_ALIASES = {'content-install': 'install'}
 
     def __init__(self, args):
         self.api = None
@@ -89,20 +90,11 @@ class GalaxyCLI(cli.CLI):
                                    help='Ignore errors and continue with the next specified role.')
             self.parser.add_option('-n', '--no-deps', dest='no_deps', action='store_true', default=False, help='Don\'t download roles listed as dependencies')
             self.parser.add_option('-r', '--role-file', dest='role_file', help='A file containing a list of roles to be imported')
+            # TODO: test this with multi-content repos
             self.parser.add_option('-g', '--keep-scm-meta', dest='keep_scm_meta', action='store_true',
                                    default=False, help='Use tar instead of the scm archive option when packaging the role')
             self.parser.add_option('-t', '--type', dest='content_type', default="all", help='A type of Galaxy Content to install: role, module, etc')
             # FIXME: rm when tests are updated
-
-        elif self.action == "content-install":
-            self.parser.set_usage("usage: %prog content-install [options] [-r FILE | role_name(s)[,version] | scm+role_repo_url[,version] | tar_file(s)]")
-            self.parser.add_option('-i', '--ignore-errors', dest='ignore_errors', action='store_true', default=False,
-                                   help='Ignore errors and continue with the next specified role.')
-            self.parser.add_option('-n', '--no-deps', dest='no_deps', action='store_true', default=False, help='Don\'t download roles listed as dependencies')
-            # FIXME - Unsure about keeping this around
-            self.parser.add_option('-r', '--role-file', dest='role_file',
-                                   help='A file containing a list of roles to be imported')
-            self.parser.add_option('-t', '--type', dest='content_type', default="all", help='A type of Galaxy Content to install: role, module, etc')
         elif self.action == "remove":
             self.parser.set_usage("usage: %prog remove role1 role2 ...")
         elif self.action == "list":
@@ -129,7 +121,7 @@ class GalaxyCLI(cli.CLI):
             self.parser.add_option('-C', '--content-path', dest='content_path',
                                    help='The path to the directory containing your galaxy content. The default is the content_path configured in your'
                                         'ansible.cfg file (/etc/ansible/content if not configured)', type='str')
-        if self.action in ("init", "install", "content-install"):
+        if self.action in ("init", "install"):
             self.parser.add_option('-f', '--force', dest='force', action='store_true', default=False, help='Force overwriting an existing role')
 
     def parse(self):
@@ -540,10 +532,6 @@ class GalaxyCLI(cli.CLI):
                                     self.display('- dependency %s is already installed, skipping.' % dep_role.name)
 
         return 0
-
-    # FIXME: rm once test scripts are updated
-    # alias content-install to install for now
-    execute_content_install = execute_install
 
     def execute_old_role_install(self):
         """
