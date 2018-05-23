@@ -6,7 +6,7 @@ from ansible_galaxy.config import config
 
 log = logging.getLogger(__name__)
 
-CONFIG_SECTIONS = ['defaults', 'servers', 'content_roots', 'options']
+CONFIG_SECTIONS = ['defaults', 'server', 'content_path', 'options']
 
 
 def assert_object(config_obj):
@@ -68,8 +68,9 @@ def test_config_as_dict():
     orig_config_data = OrderedDict(
         (
             ('defaults', {'some_default_key': 'some_default_value'}),
-            ('servers', [{'url': 'some_url_value'}]),
-            ('content_roots', []),
+            ('server', {'url': 'some_url_value',
+                        'ignore_certs': True}),
+            ('content_path', None),
             ('options', {'some_option': 'some_option_value'}),
         )
     )
@@ -87,7 +88,7 @@ def test_config_as_dict():
 def test_config_as_dict_from_partial_dict():
     orig_config_data = {
         'defaults': {'some_default_key': 'some_default_value'},
-        'servers': [{'url': 'some_url_value'}],
+        'server': {'url': 'some_url_value'},
     }
     _config = config.Config.from_dict(orig_config_data)
 
@@ -97,13 +98,12 @@ def test_config_as_dict_from_partial_dict():
     assert set(config_data.keys()) == set(CONFIG_SECTIONS)
 
     assert config_data['defaults'] == orig_config_data['defaults']
-    assert config_data['servers'] == orig_config_data['servers']
+    assert config_data['server'] == orig_config_data['server']
 
     assert isinstance(config_data['options'], dict)
     assert config_data['options'] == {}
 
-    assert isinstance(config_data['content_roots'], list)
-    assert config_data['content_roots'] == []
+    assert config_data['content_path'] is None
 
 
 def test_load_empty():
