@@ -209,7 +209,6 @@ class TestGalaxy(unittest.TestCase):
             # self.assertIsInstance(galaxycli_obj.galaxy, ansible_galaxy.models.context.GalaxyContext)
             formatted_call = {
                 'import': 'usage: %prog import [options] github_user github_repo',
-                'delete': 'usage: %prog delete [options] github_user github_repo',
                 'info': 'usage: %prog info [options] role_name[,version]',
                 'init': 'usage: %prog init [options] role_name',
                 'install': 'usage: %prog install [options] [-r FILE | role_name(s)[,version] | scm+role_repo_url[,version] | tar_file(s)]',
@@ -219,7 +218,7 @@ class TestGalaxy(unittest.TestCase):
                            '[--author username]'),
             }
 
-            first_call = 'usage: %prog [delete|import|info|init|install|content-install|list|remove|search|version] [--help] [options] ...'
+            first_call = 'usage: %prog [import|info|init|install|content-install|list|remove|search|version] [--help] [options] ...'
             second_call = formatted_call[action]
             calls = [call(first_call), call(second_call)]
             mocked_usage.assert_has_calls(calls)
@@ -233,12 +232,6 @@ class TestGalaxy(unittest.TestCase):
         ''' testing the options parser when an invalid action is given '''
         gc = GalaxyCLI(args=["ansible-galaxy", "NOT_ACTION"])
         self.assertRaises(cli_exceptions.CliOptionsError, gc.parse)
-
-    def test_parse_delete(self):
-        ''' testing the options parser when the action 'delete' is given '''
-        gc = GalaxyCLI(args=["ansible-galaxy", "delete"])
-        self.run_parse_common(gc, "delete")
-        self.assertEqual(gc.options.verbosity, 0)
 
     def test_parse_import(self):
         ''' testing the options parser when the action 'import' is given '''

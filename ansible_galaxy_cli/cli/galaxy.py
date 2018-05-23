@@ -60,7 +60,7 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("delete", "import", "info", "init", "install", "content-install", "list", "remove", "search", "version")
+    VALID_ACTIONS = ("import", "info", "init", "install", "content-install", "list", "remove", "search", "version")
 
     def __init__(self, args):
         self.api = None
@@ -71,9 +71,7 @@ class GalaxyCLI(cli.CLI):
         super(GalaxyCLI, self).set_action()
 
         # specific to actions
-        if self.action == "delete":
-            self.parser.set_usage("usage: %prog delete [options] github_user github_repo")
-        elif self.action == "import":
+        if self.action == "import":
             self.parser.set_usage("usage: %prog import [options] github_user github_repo")
             self.parser.add_option('--no-wait', dest='wait', action='store_false', default=True, help='Don\'t wait for import results.')
             self.parser.add_option('--branch', dest='reference',
@@ -132,7 +130,7 @@ class GalaxyCLI(cli.CLI):
         if self.action in ['init', 'info']:
             self.parser.add_option('--offline', dest='offline', default=False, action='store_true', help="Don't query the galaxy API when creating roles")
 
-        if self.action not in ("delete", "import", "init", "version"):
+        if self.action not in ("import", "init", "version"):
             # NOTE: while the option type=str, the default is a list, and the
             # callback will set the value to a list.
             self.parser.add_option('-p', '--roles-path', dest='roles_path', action="append", default=[],
@@ -865,27 +863,6 @@ class GalaxyCLI(cli.CLI):
                     time.sleep(10)
 
         return 0
-
-    def execute_delete(self):
-        """ Delete a role from Ansible Galaxy. """
-
-        if len(self.args) < 2:
-            raise cli_exceptions.GalaxyCliError("Missing one or more arguments. Expected: github_user github_repo")
-
-        github_repo = self.args.pop()
-        github_user = self.args.pop()
-        resp = self.api.delete_role(github_user, github_repo)
-
-        if len(resp['deleted_roles']) > 1:
-            self.display("Deleted the following roles:")
-            self.display("ID     User            Name")
-            self.display("------ --------------- ----------")
-            for role in resp['deleted_roles']:
-                self.display("%-8s %-15s %s" % (role.id, role.namespace, role.name))
-
-        self.display(resp['status'])
-
-        return True
 
     def execute_version(self):
         self.display('Ansible Galaxy CLI, version', galaxy_cli_version)
