@@ -38,7 +38,8 @@ class GalaxyContext(object):
         log.debug('server: %s', server)
 
         # TODO: server info object
-        self.server = server or {'url': None}
+        self.server = server or {'url': None,
+                                 'ignore_certs': False}
         self.content_path = content_path
 
         # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
