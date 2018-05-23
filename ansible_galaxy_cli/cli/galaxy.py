@@ -22,6 +22,7 @@
 from __future__ import (absolute_import, division, print_function)
 __metaclass__ = type
 
+import json
 import logging
 import os
 import re
@@ -204,8 +205,6 @@ class GalaxyCLI(cli.CLI):
 
         self.config = config.load(self.config_file)
 
-        log.debug(self.config)
-        import json
         log.debug(json.dumps(self.config.as_dict(), indent=4))
 
         # cli --server value or the url field of the first server in config

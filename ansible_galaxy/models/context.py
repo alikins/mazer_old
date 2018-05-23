@@ -42,9 +42,6 @@ class GalaxyContext(object):
                                  'ignore_certs': False}
         self.content_path = content_path
 
-        # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
-        # content_paths = getattr(self.options, 'content_path', [])
-
     # FIXME: rm
     @property
     def server_url(self):

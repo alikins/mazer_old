@@ -31,7 +31,6 @@ import socket
 import ssl
 
 from ansible_galaxy.flat_rest_api.token import GalaxyToken
-from ansible_galaxy.config import runtime
 from ansible_galaxy import exceptions
 from ansible_galaxy.utils.text import to_native, to_text
 
@@ -285,8 +284,8 @@ class GalaxyAPI(object):
             return data["results"][0]
         return None
 
-    #@g_connect
-    #def fetch_content_related(self, related_url):
+    # @g_connect
+    # def fetch_content_related(self, related_url):
     #    "Fetch a related item for the given content"
     #    self.log.debug('related_url=%s', related_url)
     #    url = '%s%s' % (self._api_server, related_url)
