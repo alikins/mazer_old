@@ -216,6 +216,8 @@ class GalaxyContent(object):
         """
         if self.content_type in ["role", "all"]:
             if self._metadata is None:
+                log.debug('content.meta_path: %s', self.content.meta_path)
+                log.debug('archive.META_MAIN: %s', archive.META_MAIN)
                 meta_path = os.path.join(self.content_meta.path, archive.META_MAIN)
                 if os.path.isfile(meta_path):
                     try:
@@ -240,7 +242,8 @@ class GalaxyContent(object):
         """
         # FIXME: Do we want to have this for galaxy content?
         if self._install_info is None:
-
+            log.debug('self.path: %s', self.path)
+            log.debug('self.META_INSTALL: %s', self.META_INSTALL)
             info_path = os.path.join(self.path, self.META_INSTALL)
             if os.path.isfile(info_path):
                 try:

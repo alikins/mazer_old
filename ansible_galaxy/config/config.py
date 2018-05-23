@@ -10,16 +10,16 @@ log = logging.getLogger(__name__)
 class Config(object):
     def __init__(self):
         self.defaults = {}
-        self.servers = []
-        self.content_roots = []
+        self.server = {}
+        self.content_path = None
         self.options = {}
 
     def as_dict(self):
         return collections.OrderedDict(
             (
                 ('defaults', self.defaults),
-                ('servers', self.servers),
-                ('content_roots', self.content_roots),
+                ('server', self.server),
+                ('content_path', self.content_path),
                 ('options', self.options),
             )
         )
@@ -28,8 +28,8 @@ class Config(object):
     def from_dict(cls, data):
         inst = cls()
         inst.defaults = data.get('defaults', inst.defaults)
-        inst.servers = data.get('servers', inst.servers)
-        inst.content_roots = data.get('content_roots', inst.content_roots)
+        inst.server = data.get('server', inst.server)
+        inst.content_path = data.get('content_path', inst.content_path)
         inst.options = data.get('options', inst.options)
         return inst
 

@@ -32,38 +32,24 @@ log = logging.getLogger(__name__)
 class GalaxyContext(object):
     ''' Keeps global galaxy info '''
 
-    def __init__(self, content_roots=None, servers=None):
+    def __init__(self, content_path=None, server=None):
 
-        log.debug('content_roots: %s', content_roots)
-        log.debug('servers: %s', servers)
+        log.debug('content_path: %s', content_path)
+        log.debug('server: %s', server)
 
-        self.servers = servers or []
-        self.content_roots = content_roots or []
+        # TODO: server info object
+        self.server = server or {'url': None}
+        self.content_path = content_path
 
         # default_content_paths = [os.path.expanduser(p) for p in defaults.DEFAULT_CONTENT_PATH]
         # content_paths = getattr(self.options, 'content_path', [])
 
-    @property
-    def server(self):
-        if not self.servers:
-            return None
-        # Default to first server in the list
-        return self.servers[0]
-
     # FIXME: rm
     @property
     def server_url(self):
-        if not self.servers:
+        if not self.server:
             return None
-        # Default to first server in the list
-        return self.servers[0]['url']
-
-    @property
-    def content_path(self):
-        if not self.content_roots:
-            return None
-        # Default to first content_root in the list
-        return self.content_roots[0]
+        return self.server['url']
 
     @classmethod
     def from_config_and_options(cls, config, options):
@@ -115,17 +101,5 @@ class GalaxyContext(object):
         return inst
 
     def __repr__(self):
-        return 'GalaxyContext(content_roots=%s, servers=%s)' % \
-            (self.content_roots, self.servers)
-
-    # def add_role(self, role):
-    #    self.roles[role.name] = role
-
-    # def remove_role(self, role_name):
-    #    del self.roles[role_name]
-
-    # def add_content(self, content):
-    #    self.content[content.name] = content
-
-    # def remove_content(self, content_name):
-    #     del self.content[content_name]
+        return 'GalaxyContext(content_path=%s, server=%s)' % \
+            (self.content_path, self.server)
