@@ -28,7 +28,6 @@ import os
 import re
 import shutil
 import sys
-import yaml
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -58,7 +57,7 @@ class GalaxyCLI(cli.CLI):
     '''command to manage Ansible roles in shared repostories, the default of which is Ansible Galaxy *https://galaxy.ansible.com*.'''
 
     SKIP_INFO_KEYS = ("name", "description", "readme_html", "related", "summary_fields", "average_aw_composite", "average_aw_score", "url")
-    VALID_ACTIONS = ("info", "init", "install", "list", "remove", "search", "version")
+    VALID_ACTIONS = ("info", "init", "install", "list", "remove", "version")
     VALID_ACTION_ALIASES = {'content-install': 'install'}
 
     def __init__(self, args):
@@ -99,12 +98,6 @@ class GalaxyCLI(cli.CLI):
             self.parser.set_usage("usage: %prog remove role1 role2 ...")
         elif self.action == "list":
             self.parser.set_usage("usage: %prog list [role_name]")
-        elif self.action == "search":
-            self.parser.set_usage("usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] "
-                                  "[--author username]")
-            self.parser.add_option('--platforms', dest='platforms', help='list of OS platforms to filter by')
-            self.parser.add_option('--galaxy-tags', dest='galaxy_tags', help='list of galaxy tags to filter by')
-            self.parser.add_option('--author', dest='author', help='GitHub username')
         elif self.action == "version":
             self.parser.set_usage("usage: %prog version")
 
@@ -606,54 +599,6 @@ class GalaxyCLI(cli.CLI):
                             version = "(unknown version)"
                         self.display("- %s, %s" % (path_file, version))
         return 0
-
-    def execute_search(self):
-        ''' searches for roles on the Ansible Galaxy server'''
-        page_size = 1000
-        search = None
-
-        if len(self.args):
-            terms = []
-            for i in range(len(self.args)):
-                terms.append(self.args.pop())
-            search = '+'.join(terms[::-1])
-
-        if not search and not self.options.platforms and not self.options.galaxy_tags and not self.options.author:
-            raise cli_exceptions.GalaxyCliError("Invalid query. At least one search term, platform, galaxy tag or author must be provided.")
-
-        response = self.api.search_content(search, platforms=self.options.platforms,
-                                           tags=self.options.galaxy_tags, author=self.options.author, page_size=page_size)
-
-        if response['count'] == 0:
-            self.display("No content match your search.")
-            return True
-
-        data = [u'']
-
-        if response['count'] > page_size:
-            data.append(u"Found %d content matching your search. Showing first %s." % (response['count'], page_size))
-        else:
-            data.append(u"Found %d content matching your search:" % response['count'])
-
-        max_len = []
-        for content in response['results']:
-            # FIXME: too many chained fields to trust, need obj
-            user_namespace = content['summary_fields']['namespace']['name']
-            max_len.append(len(user_namespace + '.' + content['name']))
-        name_len = max(max_len)
-
-        format_str = u" %%-%ds %%s" % name_len
-        data.append(u'')
-        data.append(format_str % (u"Name", u"Description"))
-        data.append(format_str % (u"----", u"-----------"))
-        for content in response['results']:
-            user_namespace = content['summary_fields']['namespace']['name']
-            data.append(format_str % (u'%s.%s' % (user_namespace, content['name']),
-                                      content['description']))
-
-        data = u'\n'.join(data)
-        self.display(data)
-        return True
 
     def execute_version(self):
         self.display('Ansible Galaxy CLI, version', galaxy_cli_version)

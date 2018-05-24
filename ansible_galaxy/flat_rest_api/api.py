@@ -24,7 +24,6 @@ __metaclass__ = type
 
 import logging
 import json
-import six
 from six.moves.urllib.error import HTTPError
 from six.moves.urllib.parse import quote as urlquote, urlencode
 import socket
@@ -270,42 +269,6 @@ class GalaxyAPI(object):
         except Exception as error:
             self.log.exception(error)
             raise exceptions.GalaxyClientError("Failed to download the %s list: %s" % (what, str(error)))
-
-    @g_connect
-    def search_content(self, search, **kwargs):
-        self.log.debug('search=%s', search)
-        self.log.debug('kwargs=%s', kwargs)
-
-        search_url = self.baseurl + '/search/content/?'
-
-        if search:
-            search_url += '&autocomplete=' + urlquote(search)
-
-        tags = kwargs.get('tags', None)
-        platforms = kwargs.get('platforms', None)
-        page_size = kwargs.get('page_size', None)
-        author = kwargs.get('author', None)
-
-        if tags and isinstance(tags, six.string_types):
-            tags = tags.split(',')
-
-            # TODO: the autocomplete search seems pretty vague...
-            #       maybe except a wildcard or option for exact match?
-            # searchs=' + '+'.join(tags)
-            search_url += '&tags_autocomplete=' + '+'.join(tags)
-
-        if platforms and isinstance(platforms, six.string_types):
-            platforms = platforms.split(',')
-            search_url += '&platforms_autocomplete=' + '+'.join(platforms)
-
-        if page_size:
-            search_url += '&page_size=%s' % page_size
-
-        if author:
-            search_url += '&username_autocomplete=%s' % author
-
-        data = self.__call_galaxy(search_url, method='GET')
-        return data
 
     @g_connect
     def add_secret(self, source, github_user, github_repo, secret):

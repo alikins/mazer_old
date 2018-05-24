@@ -209,12 +209,10 @@ class TestGalaxy(unittest.TestCase):
                 'install': 'usage: %prog install [options] [-r FILE | role_name(s)[,version] | scm+role_repo_url[,version] | tar_file(s)]',
                 'list': 'usage: %prog list [role_name]',
                 'remove': 'usage: %prog remove role1 role2 ...',
-                'search': ('usage: %prog search [searchterm1 searchterm2] [--galaxy-tags galaxy_tag1,galaxy_tag2] [--platforms platform1,platform2] '
-                           '[--author username]'),
                 'version': 'usage: %prog version',
             }
 
-            first_call = 'usage: %prog [info|init|install|list|remove|search|version] [--help] [options] ...'
+            first_call = 'usage: %prog [info|init|install|list|remove|version] [--help] [options] ...'
             second_call = formatted_call[action]
             calls = [call(first_call), call(second_call)]
             mocked_usage.assert_has_calls(calls)
@@ -262,14 +260,6 @@ class TestGalaxy(unittest.TestCase):
         gc = GalaxyCLI(args=["ansible-galaxy", "remove"])
         self.run_parse_common(gc, "remove")
         self.assertEqual(gc.options.verbosity, 0)
-
-    def test_parse_search(self):
-        ''' testing the options parswer when the action 'search' is given '''
-        gc = GalaxyCLI(args=["ansible-galaxy", "search"])
-        self.run_parse_common(gc, "search")
-        self.assertEqual(gc.options.platforms, None)
-        self.assertEqual(gc.options.galaxy_tags, None)
-        self.assertEqual(gc.options.author, None)
 
     def test_parse_version(self):
         ''' testing the options parser when the action 'version' is given '''
