@@ -22,22 +22,20 @@ def get_content_version(content_data, version, content_versions, content_content
     log.debug('%s vers avail: %s',
               content_content_name, json.dumps(content_versions, indent=2))
 
-    # a list of tuples of (normalized_version, original_version) for building normalized_version_map
-    # TODO: could use dict comprehension I suppose
-    normalized_versions_tup_list = [(normalize_version_string(x), x) for x in content_versions]
-    log.debug('normalized_versions_tup_list: %s', json.dumps(normalized_versions_tup_list, indent=4))
+    # a list of tuples of (normalized_version, original_version) for building map of normalized version to original version
+    normalized_versions = [(normalize_version_string(x), x) for x in content_versions]
 
-    available_normalized_versions = [nver_and_orig_ver_tup[0] for nver_and_orig_ver_tup in normalized_versions_tup_list]
+    available_normalized_versions = [v[0] for v in normalized_versions]
 
     # map the 'normalized' version back to the original version string, we need it for content archive download urls
-    norm_to_orig_map = dict(normalized_versions_tup_list)
-    log.debug('norm_ver_map: %s', json.dumps(norm_to_orig_map, indent=4))
+    norm_to_orig_map = dict(normalized_versions)
 
     normalized_version = normalize_version_string(version)
 
     log.debug('normalized_version: %s', normalized_version)
     log.debug('avail_normalized_versions: %s', json.dumps(available_normalized_versions, indent=4))
 
+    # we specified a particular version is required so look for it in available versions
     if version and version != 'master':
         if not available_normalized_versions:
             # FIXME: should we show the actual available versions or the available
