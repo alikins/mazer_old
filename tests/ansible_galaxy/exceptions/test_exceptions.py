@@ -1,3 +1,5 @@
+
+# -*- coding: utf-8 -*-
 import logging
 
 from ansible_galaxy import exceptions
@@ -20,10 +22,6 @@ def test_galaxy_download_error_no_args():
 VALID_STRINGS = (
     (b'abcde', u'abcde', 'ascii'),
     (b'caf\xc3\xa9', u'caf\xe9', 'utf-8'),
-    (b'caf\xe9', u'caf\xe9', 'latin-1'),
-    # u'くらとみ'
-    (b'\xe3\x81\x8f\xe3\x82\x89\xe3\x81\xa8\xe3\x81\xbf', u'\u304f\u3089\u3068\u307f', 'utf-8'),
-    (b'\x82\xad\x82\xe7\x82\xc6\x82\xdd', u'\u304f\u3089\u3068\u307f', 'shift-jis'),
 )
 
 
